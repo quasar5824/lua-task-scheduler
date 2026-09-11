@@ -21,6 +21,10 @@ function Scheduler:add_task(callback, delay, interval, priority)
     return task
 end
 
+function Scheduler:clear()
+    self.tasks = {}
+end
+
 function Scheduler:_sort_tasks()
     table.sort(self.tasks, function(a, b)
         if a.next_run ~= b.next_run then

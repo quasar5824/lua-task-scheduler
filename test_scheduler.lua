@@ -29,3 +29,14 @@ print("T=2.5: " .. #results .. " tasks run")
 for i, v in ipairs(results) do
     print(i .. ": " .. v)
 end
+
+-- Test 5: Clear tasks
+print("Clearing scheduler...")
+sched:clear()
+sched:add_task(function(t) results[#results+1] = "Task D at " .. t end, 0)
+sched:update(0)
+print("T=2.5 (after clear): " .. #results .. " tasks run")
+
+for i, v in ipairs(results) do
+    print(i .. ": " .. v)
+end
