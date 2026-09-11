@@ -19,8 +19,8 @@ print("T=0.5: " .. #results .. " tasks run")
 sched:update(1.0)
 print("T=1.5: " .. #results .. " tasks run")
 
--- Test 4: Cancel the recurring task
-recurring.cancelled = true
+-- Test 4: Cancel the recurring task using API
+sched:cancel_task(recurring)
 print("Task C cancelled at T=1.5")
 
 sched:update(1.0)

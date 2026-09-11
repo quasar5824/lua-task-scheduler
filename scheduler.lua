@@ -21,6 +21,12 @@ function Scheduler:add_task(callback, delay, interval, priority)
     return task
 end
 
+function Scheduler:cancel_task(task)
+    if task then
+        task.cancelled = true
+    end
+end
+
 function Scheduler:clear()
     self.tasks = {}
 end
