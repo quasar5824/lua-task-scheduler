@@ -13,17 +13,21 @@ function Scheduler:add_task(callback, delay, interval, priority)
         callback = callback,
         next_run = self.currentTime + (delay or 0),
         interval = interval,
-        priority = priority or 0
+        priority = priority or 0,
+        cancelled = false
     }
     table.insert(self.tasks, task)
-    -- Sort by next_run (primary) and priority (secondary)
+    self:_sort_tasks()
+    return task
+end
+
+function Scheduler:_sort_tasks()
     table.sort(self.tasks, function(a, b)
         if a.next_run ~= b.next_run then
             return a.next_run < b.next_run
         end
         return a.priority > b.priority
     end)
-    return task
 end
 
 function Scheduler:update(deltaTime)
@@ -31,11 +35,15 @@ function Scheduler:update(deltaTime)
     
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
         local task = table.remove(self.tasks, 1)
-        task.callback(self.currentTime)
         
-        if task.interval then
-            task.next_run = self.currentTime + task.interval
-            self:add_task(task.callback, 0, task.interval, task.priority)
+        if not task.cancelled then
+            task.callback(self.currentTime)
+            
+            if task.interval then
+                task.next_run = self.currentTime + task.interval
+                table.insert(self.tasks, task)
+                self:_sort_tasks()
+            end
         end
     end
 end
