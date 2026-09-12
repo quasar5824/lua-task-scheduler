@@ -16,8 +16,7 @@ function Scheduler:add_task(callback, delay, interval, priority)
         priority = priority or 0,
         cancelled = false
     }
-    table.insert(self.tasks, task)
-    self:_sort_tasks()
+    self:_insert_task(task)
     return task
 end
 
@@ -31,13 +30,31 @@ function Scheduler:clear()
     self.tasks = {}
 end
 
-function Scheduler:_sort_tasks()
-    table.sort(self.tasks, function(a, b)
-        if a.next_run ~= b.next_run then
-            return a.next_run < b.next_run
+function Scheduler:_insert_task(task)
+    local low = 1
+    local high = #self.tasks
+    
+    while low <= high do
+        local mid = math.floor((low + high) / 2)
+        local other = self.tasks[mid]
+        
+        local should_come_before = false
+        if task.next_run < other.next_run then
+            should_come_before = true
+        elseif task.next_run == other.next_run then
+            if task.priority > other.priority then
+                should_come_before = true
+            end
         end
-        return a.priority > b.priority
-    end)
+        
+        if should_come_before then
+            high = mid - 1
+        else
+            low = mid + 1
+        end
+    end
+    
+    table.insert(self.tasks, low, task)
 end
 
 function Scheduler:update(deltaTime)
@@ -51,8 +68,7 @@ function Scheduler:update(deltaTime)
             
             if task.interval then
                 task.next_run = self.currentTime + task.interval
-                table.insert(self.tasks, task)
-                self:_sort_tasks()
+                self:_insert_task(task)
             end
         end
     end
