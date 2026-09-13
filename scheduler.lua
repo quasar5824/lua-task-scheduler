@@ -30,6 +30,16 @@ function Scheduler:clear()
     self.tasks = {}
 end
 
+function Scheduler:pending_tasks()
+    local count = 0
+    for _, task in ipairs(self.tasks) do
+        if not task.cancelled then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 function Scheduler:_insert_task(task)
     local low = 1
     local high = #self.tasks

@@ -37,6 +37,21 @@ sched:add_task(function(t) results[#results+1] = "Task D at " .. t end, 0)
 sched:update(0)
 print("T=2.5 (after clear): " .. #results .. " tasks run")
 
-for i, v in ipairs(results) do
-    print(i .. ": " .. v)
-end
+-- Test 6: Priority check
+print("Testing priority...")
+results = {}
+local p_sched = Scheduler.new()
+p_sched:add_task(function(t) results[#results+1] = "Low Priority" end, 0, nil, 0)
+p_sched:add_task(function(t) results[#results+1] = "High Priority" end, 0, nil, 10)
+p_sched:update(0)
+print("Priority result 1: " .. results[1])
+print("Priority result 2: " .. results[2])
+
+-- Test 7: pending_tasks count
+print("Testing pending_tasks count...")
+sched:clear()
+sched:add_task(function() end, 1)
+sched:add_task(function() end, 2)
+local t_can = sched:add_task(function() end, 3)
+sched:cancel_task(t_can)
+print("Pending tasks (should be 2): " .. sched:pending_tasks())
