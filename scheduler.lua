@@ -41,6 +41,17 @@ function Scheduler:pending_tasks()
     return count
 end
 
+function Scheduler:prune_cancelled()
+    local i = 1
+    while i <= #self.tasks do
+        if self.tasks[i].cancelled then
+            table.remove(self.tasks, i)
+        else
+            i = i + 1
+        end
+    end
+end
+
 function Scheduler:_insert_task(task)
     local low = 1
     local high = #self.tasks

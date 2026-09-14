@@ -72,3 +72,21 @@ local a_sched = Scheduler.new()
 a_sched:add_task(function(t, args) results[#results+1] = args.name .. " at " .. t end, 0, nil, 0, {name = "ArgTask"})
 a_sched:update(0)
 print("Arg result: " .. (results[1] == "ArgTask at 0" and "Success" or "Failure"))
+
+-- Test 10: Pruning cancelled tasks
+print("Testing pruning...")
+local prune_sched = Scheduler.new()
+prune_sched:add_task(function() end, 10)
+prune_sched:add_task(function() end, 20)
+local t_to_prune = prune_sched:add_task(function() end, 30)
+prune_sched:cancel_task(t_to_prune)
+
+-- Check internal task list size (simulated via pending_tasks)
+print("Pending before prune: " .. prune_sched:pending_tasks())
+prune_sched:prune_cancelled()
+print("Pending after prune: " .. prune_sched:pending_tasks())
+-- We can't easily check internal list size without adding a getter, 
+-- but pending_tasks is already filtered. Let's verify prune doesn't break active tasks.
+prune_sched:add_task(function(t) results[#results+1] = "PruneTest" end, 0)
+prune_sched:update(0)
+print("Active task after prune ran: " .. (results[#results] == "PruneTest" and "Yes" or "No"))
