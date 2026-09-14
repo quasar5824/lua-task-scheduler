@@ -55,3 +55,12 @@ sched:add_task(function() end, 2)
 local t_can = sched:add_task(function() end, 3)
 sched:cancel_task(t_can)
 print("Pending tasks (should be 2): " .. sched:pending_tasks())
+
+-- Test 8: Error handling
+print("Testing error handling...")
+results = {}
+local e_sched = Scheduler.new()
+e_sched:add_task(function() error("Boom!") end, 0)
+e_sched:add_task(function() results[#results+1] = "Survivor" end, 0)
+e_sched:update(0)
+print("Survivor task ran: " .. (results[1] == "Survivor" and "Yes" or "No"))

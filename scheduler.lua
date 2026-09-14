@@ -74,7 +74,10 @@ function Scheduler:update(deltaTime)
         local task = table.remove(self.tasks, 1)
         
         if not task.cancelled then
-            task.callback(self.currentTime)
+            local success, err = pcall(task.callback, self.currentTime)
+            if not success then
+                print("Task Scheduler Error: " .. tostring(err))
+            end
             
             if task.interval then
                 task.next_run = self.currentTime + task.interval
