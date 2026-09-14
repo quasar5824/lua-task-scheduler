@@ -8,13 +8,14 @@ function Scheduler.new()
     }, Scheduler)
 end
 
-function Scheduler:add_task(callback, delay, interval, priority)
+function Scheduler:add_task(callback, delay, interval, priority, args)
     local task = {
         callback = callback,
         next_run = self.currentTime + (delay or 0),
         interval = interval,
         priority = priority or 0,
-        cancelled = false
+        cancelled = false,
+        args = args
     }
     self:_insert_task(task)
     return task
@@ -74,7 +75,8 @@ function Scheduler:update(deltaTime)
         local task = table.remove(self.tasks, 1)
         
         if not task.cancelled then
-            local success, err = pcall(task.callback, self.currentTime)
+            -- Pass currentTime and any provided arguments to the callback
+            local success, err = pcall(task.callback, self.currentTime, task.args)
             if not success then
                 print("Task Scheduler Error: " .. tostring(err))
             end

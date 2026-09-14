@@ -64,3 +64,11 @@ e_sched:add_task(function() error("Boom!") end, 0)
 e_sched:add_task(function() results[#results+1] = "Survivor" end, 0)
 e_sched:update(0)
 print("Survivor task ran: " .. (results[1] == "Survivor" and "Yes" or "No"))
+
+-- Test 9: Task arguments
+print("Testing task arguments...")
+results = {}
+local a_sched = Scheduler.new()
+a_sched:add_task(function(t, args) results[#results+1] = args.name .. " at " .. t end, 0, nil, 0, {name = "ArgTask"})
+a_sched:update(0)
+print("Arg result: " .. (results[1] == "ArgTask at 0" and "Success" or "Failure"))
