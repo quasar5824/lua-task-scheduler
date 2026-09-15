@@ -81,12 +81,19 @@ prune_sched:add_task(function() end, 20)
 local t_to_prune = prune_sched:add_task(function() end, 30)
 prune_sched:cancel_task(t_to_prune)
 
--- Check internal task list size (simulated via pending_tasks)
-print("Pending before prune: " .. prune_sched:pending_tasks())
+print("Total tasks before prune: " .. prune_sched:total_tasks())
 prune_sched:prune_cancelled()
-print("Pending after prune: " .. prune_sched:pending_tasks())
--- We can't easily check internal list size without adding a getter, 
--- but pending_tasks is already filtered. Let's verify prune doesn't break active tasks.
+print("Total tasks after prune: " .. prune_sched:total_tasks())
+
 prune_sched:add_task(function(t) results[#results+1] = "PruneTest" end, 0)
 prune_sched:update(0)
 print("Active task after prune ran: " .. (results[#results] == "PruneTest" and "Yes" or "No"))
+
+-- Test 11: remove_task
+print("Testing remove_task...")
+local rm_sched = Scheduler.new()
+local t_rm = rm_sched:add_task(function() end, 10)
+print("Total tasks before remove: " .. rm_sched:total_tasks())
+local removed = rm_sched:remove_task(t_rm)
+print("Remove successful: " .. (removed and "Yes" or "No"))
+print("Total tasks after remove: " .. rm_sched:total_tasks())

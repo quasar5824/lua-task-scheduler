@@ -27,6 +27,17 @@ function Scheduler:cancel_task(task)
     end
 end
 
+function Scheduler:remove_task(task)
+    if not task then return end
+    for i = 1, #self.tasks do
+        if self.tasks[i] == task then
+            table.remove(self.tasks, i)
+            return true
+        end
+    end
+    return false
+end
+
 function Scheduler:clear()
     self.tasks = {}
 end
@@ -39,6 +50,10 @@ function Scheduler:pending_tasks()
         end
     end
     return count
+end
+
+function Scheduler:total_tasks()
+    return #self.tasks
 end
 
 function Scheduler:prune_cancelled()
