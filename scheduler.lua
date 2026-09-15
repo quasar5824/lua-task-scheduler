@@ -38,6 +38,18 @@ function Scheduler:remove_task(task)
     return false
 end
 
+function Scheduler:reschedule_task(task, new_delay)
+    if not task then return false end
+    
+    -- To maintain the sorted order of the task list, we must remove and re-insert
+    if self:remove_task(task) then
+        task.next_run = self.currentTime + (new_delay or 0)
+        self:_insert_task(task)
+        return true
+    end
+    return false
+end
+
 function Scheduler:clear()
     self.tasks = {}
 end

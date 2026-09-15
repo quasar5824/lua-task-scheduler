@@ -97,3 +97,18 @@ print("Total tasks before remove: " .. rm_sched:total_tasks())
 local removed = rm_sched:remove_task(t_rm)
 print("Remove successful: " .. (removed and "Yes" or "No"))
 print("Total tasks after remove: " .. rm_sched:total_tasks())
+
+-- Test 12: reschedule_task
+print("Testing reschedule_task...")
+results = {}
+local res_sched = Scheduler.new()
+local t_res = res_sched:add_task(function(t) results[#results+1] = "Rescheduled Task at " .. t end, 10)
+
+-- Push it further back
+res_sched:reschedule_task(t_res, 20)
+res_sched:update(15)
+print("Tasks run at T=15 (should be 0): " .. #results)
+
+res_sched:update(5)
+print("Tasks run at T=20 (should be 1): " .. #results)
+print("Reschedule result: " .. (results[1] == "Rescheduled Task at 20" and "Success" or "Failure"))
