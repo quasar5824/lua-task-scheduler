@@ -77,6 +77,16 @@ function Scheduler:get_tasks()
     return copy
 end
 
+function Scheduler:peek_next_task()
+    -- Return the first non-cancelled task in the sorted list
+    for i = 1, #self.tasks do
+        if not self.tasks[i].cancelled then
+            return self.tasks[i]
+        end
+    end
+    return nil
+end
+
 function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do

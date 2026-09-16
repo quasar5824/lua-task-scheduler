@@ -112,3 +112,16 @@ print("Tasks run at T=15 (should be 0): " .. #results)
 res_sched:update(5)
 print("Tasks run at T=20 (should be 1): " .. #results)
 print("Reschedule result: " .. (results[1] == "Rescheduled Task at 20" and "Success" or "Failure"))
+
+-- Test 13: peek_next_task
+print("Testing peek_next_task...")
+local peek_sched = Scheduler.new()
+local t_next = peek_sched:add_task(function() end, 5)
+local t_later = peek_sched:add_task(function() end, 10)
+
+local peeked = peek_sched:peek_next_task()
+print("Peeked task is correct: " .. (peeked == t_next and "Yes" or "No"))
+
+peek_sched:cancel_task(t_next)
+peeked = peek_sched:peek_next_task()
+print("Peeked task after cancellation is correct: " .. (peeked == t_later and "Yes" or "No"))
