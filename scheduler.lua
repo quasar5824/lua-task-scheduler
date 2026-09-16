@@ -68,6 +68,15 @@ function Scheduler:total_tasks()
     return #self.tasks
 end
 
+function Scheduler:get_tasks()
+    -- Return a copy of the tasks table to avoid external modification of the queue structure
+    local copy = {}
+    for i, task in ipairs(self.tasks) do
+        copy[i] = task
+    end
+    return copy
+end
+
 function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
