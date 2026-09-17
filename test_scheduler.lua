@@ -125,3 +125,18 @@ print("Peeked task is correct: " .. (peeked == t_next and "Yes" or "No"))
 peek_sched:cancel_task(t_next)
 peeked = peek_sched:peek_next_task()
 print("Peeked task after cancellation is correct: " .. (peeked == t_later and "Yes" or "No"))
+
+-- Test 14: Pause/Resume
+print("Testing pause/resume...")
+results = {}
+local p_sched_pause = Scheduler.new()
+p_sched_pause:add_task(function(t) results[#results+1] = "Paused Task at " .. t end, 1)
+
+p_sched_pause:pause()
+p_sched_pause:update(2)
+print("Tasks run while paused (should be 0): " .. #results)
+
+p_sched_pause:resume()
+p_sched_pause:update(0)
+print("Tasks run after resume (should be 1): " .. #results)
+print("Pause result: " .. (results[1] == "Paused Task at 0" and "Success" or "Failure"))

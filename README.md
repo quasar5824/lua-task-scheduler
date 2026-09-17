@@ -38,3 +38,6 @@ end
 - `pending_tasks()`: Returns count of non-cancelled tasks.
 - `total_tasks()`: Returns total count of tasks in the queue.
 - `get_tasks()`: Returns a list of all current task objects.
+- `pause()`: Suspends the execution of tasks.
+- `resume()`: Resumes the execution of tasks.
+- `is_paused()`: Returns whether the scheduler is currently paused.

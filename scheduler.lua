@@ -4,7 +4,8 @@ Scheduler.__index = Scheduler
 function Scheduler.new()
     return setmetatable({
         tasks = {},
-        currentTime = 0
+        currentTime = 0,
+        paused = false
     }, Scheduler)
 end
 
@@ -98,6 +99,18 @@ function Scheduler:prune_cancelled()
     end
 end
 
+function Scheduler:pause()
+    self.paused = true
+end
+
+function Scheduler:resume()
+    self.paused = false
+end
+
+function Scheduler:is_paused()
+    return self.paused
+end
+
 function Scheduler:_insert_task(task)
     local low = 1
     local high = #self.tasks
@@ -126,6 +139,10 @@ function Scheduler:_insert_task(task)
 end
 
 function Scheduler:update(deltaTime)
+    if self.paused then
+        return
+    end
+
     self.currentTime = self.currentTime + deltaTime
     
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
