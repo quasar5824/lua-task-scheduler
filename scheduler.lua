@@ -138,14 +138,21 @@ function Scheduler:_insert_task(task)
     table.insert(self.tasks, low, task)
 end
 
-function Scheduler:update(deltaTime)
+function Scheduler:update(deltaTime, maxExecutionTime)
     if self.paused then
         return
     end
 
     self.currentTime = self.currentTime + deltaTime
     
+    local startTime = os.clock()
+    
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
+        -- If maxExecutionTime is provided, check if we've exceeded the budget
+        if maxExecutionTime and (os.clock() - startTime) > maxExecutionTime then
+            break
+        end
+
         local task = table.remove(self.tasks, 1)
         
         if not task.cancelled then

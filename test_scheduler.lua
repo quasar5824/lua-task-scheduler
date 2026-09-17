@@ -140,3 +140,20 @@ p_sched_pause:resume()
 p_sched_pause:update(0)
 print("Tasks run after resume (should be 1): " .. #results)
 print("Pause result: " .. (results[1] == "Paused Task at 0" and "Success" or "Failure"))
+
+-- Test 15: Max Execution Time
+print("Testing max execution time...")
+results = {}
+local limit_sched = Scheduler.new()
+for i = 1, 10 do
+    limit_sched:add_task(function() 
+        -- Simulate work
+        local start = os.clock()
+        while os.clock() - start < 0.01 do end
+        results[#results+1] = "Work"
+    end, 0)
+end
+
+-- Set a very small limit that should cut off some tasks
+limit_sched:update(0, 0.02)
+print("Tasks run with limit (should be < 10): " .. #results)
