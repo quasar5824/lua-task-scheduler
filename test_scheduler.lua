@@ -157,3 +157,17 @@ end
 -- Set a very small limit that should cut off some tasks
 limit_sched:update(0, 0.02)
 print("Tasks run with limit (should be < 10): " .. #results)
+
+-- Test 16: Task Tagging
+print("Testing task tagging...")
+local tag_sched = Scheduler.new()
+tag_sched:add_task(function() end, 1, nil, 0, nil, "AI")
+tag_sched:add_task(function() end, 2, nil, 0, nil, "AI")
+tag_sched:add_task(function() end, 3, nil, 0, nil, "Network")
+
+local ai_tasks = tag_sched:get_tasks_by_tag("AI")
+print("AI tasks found (should be 2): " .. #ai_tasks)
+
+local cancelled_count = tag_sched:cancel_tasks_by_tag("AI")
+print("AI tasks cancelled (should be 2): " .. cancelled_count)
+print("Total pending (should be 1): " .. tag_sched:pending_tasks())

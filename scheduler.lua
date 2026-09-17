@@ -9,14 +9,15 @@ function Scheduler.new()
     }, Scheduler)
 end
 
-function Scheduler:add_task(callback, delay, interval, priority, args)
+function Scheduler:add_task(callback, delay, interval, priority, args, tag)
     local task = {
         callback = callback,
         next_run = self.currentTime + (delay or 0),
         interval = interval,
         priority = priority or 0,
         cancelled = false,
-        args = args
+        args = args,
+        tag = tag
     }
     self:_insert_task(task)
     return task
@@ -26,6 +27,18 @@ function Scheduler:cancel_task(task)
     if task then
         task.cancelled = true
     end
+end
+
+function Scheduler:cancel_tasks_by_tag(tag)
+    if not tag then return 0 end
+    local count = 0
+    for _, task in ipairs(self.tasks) do
+        if task.tag == tag then
+            task.cancelled = true
+            count = count + 1
+        end
+    end
+    return count
 end
 
 function Scheduler:remove_task(task)
@@ -76,6 +89,18 @@ function Scheduler:get_tasks()
         copy[i] = task
     end
     return copy
+end
+
+function Scheduler:get_tasks_by_tag(tag)
+    if not tag then return {}
+    end
+    local filtered = {}
+    for _, task in ipairs(self.tasks) do
+        if task.tag == tag then
+            table.insert(filtered, task)
+        end
+    end
+    return filtered
 end
 
 function Scheduler:peek_next_task()
