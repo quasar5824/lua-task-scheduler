@@ -52,6 +52,21 @@ function Scheduler:remove_task(task)
     return false
 end
 
+function Scheduler:remove_tasks_by_tag(tag)
+    if not tag then return 0 end
+    local count = 0
+    local i = 1
+    while i <= #self.tasks do
+        if self.tasks[i].tag == tag then
+            table.remove(self.tasks, i)
+            count = count + 1
+        else
+            i = i + 1
+        end
+    end
+    return count
+end
+
 function Scheduler:reschedule_task(task, new_delay)
     if not task then return false end
     
@@ -62,6 +77,44 @@ function Scheduler:reschedule_task(task, new_delay)
         return true
     end
     return false
+end
+
+function Scheduler:update_task(task, updates)
+    if not task or not updates then return false end
+    
+    local needs_reinsert = false
+    
+    if updates.delay then
+        task.next_run = self.currentTime + updates.delay
+        needs_reinsert = true
+    end
+    
+    if updates.priority then
+        task.priority = updates.priority
+        needs_reinsert = true
+    end
+    
+    if updates.interval then
+        task.interval = updates.interval
+    end
+    
+    if updates.tag then
+        task.tag = updates.tag
+    end
+    
+    if updates.args then
+        task.args = updates.args
+    end
+
+    if needs_reinsert then
+        if self:remove_task(task) then
+            self:_insert_task(task)
+            return true
+        end
+        return false
+    end
+    
+    return true
 end
 
 function Scheduler:clear()

@@ -171,3 +171,25 @@ print("AI tasks found (should be 2): " .. #ai_tasks)
 local cancelled_count = tag_sched:cancel_tasks_by_tag("AI")
 print("AI tasks cancelled (should be 2): " .. cancelled_count)
 print("Total pending (should be 1): " .. tag_sched:pending_tasks())
+
+-- Test 17: update_task
+print("Testing update_task...")
+results = {}
+local up_sched = Scheduler.new()
+local t_up = up_sched:add_task(function(t) results[#results+1] = "Updated" end, 10)
+
+-- Change delay to 0 and priority
+up_sched:update_task(t_up, {delay = 0, priority = 100})
+up_sched:update(0)
+print("Update result: " .. (results[1] == "Updated" and "Success" or "Failure"))
+
+-- Test 18: remove_tasks_by_tag
+print("Testing remove_tasks_by_tag...")
+local rm_tag_sched = Scheduler.new()
+rm_tag_sched:add_task(function() end, 1, nil, 0, nil, "Temp")
+rm_tag_sched:add_task(function() end, 2, nil, 0, nil, "Temp")
+rm_tag_sched:add_task(function() end, 3, nil, 0, nil, "Keep")
+
+local removed_count = rm_tag_sched:remove_tasks_by_tag("Temp")
+print("Tasks removed by tag (should be 2): " .. removed_count)
+print("Total tasks remaining (should be 1): " .. rm_tag_sched:total_tasks())
