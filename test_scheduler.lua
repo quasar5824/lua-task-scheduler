@@ -193,3 +193,21 @@ rm_tag_sched:add_task(function() end, 3, nil, 0, nil, "Keep")
 local removed_count = rm_tag_sched:remove_tasks_by_tag("Temp")
 print("Tasks removed by tag (should be 2): " .. removed_count)
 print("Total tasks remaining (should be 1): " .. rm_tag_sched:total_tasks())
+
+-- Test 19: Dynamic control from callback
+print("Testing dynamic control...")
+results = {}
+local dyn_sched = Scheduler.new()
+local count = 0
+dyn_sched:add_task(function(t)
+    count = count + 1
+    results[#results+1] = "Dyn " .. count
+    if count >= 3 then
+        return { cancel = true }
+    end
+    return { next_delay = count }
+end, 0)
+
+for i = 1, 10 do dyn_sched:update(1) end
+print("Dynamic tasks run (should be 3): " .. #results)
+print("Final count correct: " .. (count == 3 and "Yes" or "No"))

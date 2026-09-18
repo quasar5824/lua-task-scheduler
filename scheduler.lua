@@ -235,13 +235,35 @@ function Scheduler:update(deltaTime, maxExecutionTime)
         
         if not task.cancelled then
             -- Pass currentTime and any provided arguments to the callback
-            local success, err = pcall(task.callback, self.currentTime, task.args)
+            local success, result = pcall(task.callback, self.currentTime, task.args)
             if not success then
-                print("Task Scheduler Error: " .. tostring(err))
+                print("Task Scheduler Error: " .. tostring(result))
             end
             
-            if task.interval then
+            -- Task control logic
+            local should_reschedule = true
+            
+            if type(result) == "table" then
+                if result.cancel == true then
+                    should_reschedule = false
+                end
+                if result.next_delay then
+                    task.next_run = self.currentTime + result.next_delay
+                elseif task.interval then
+                    task.next_run = self.currentTime + task.interval
+                end
+            elseif task.interval then
                 task.next_run = self.currentTime + task.interval
+            end
+
+            if should_reschedule and (task.interval or result) then
+                -- If the task is not recurring and didn't provide a next_delay, don't reschedule
+                if not task.interval and (type(result) ~= "table" or not result.next_delay) then
+                    should_reschedule = false
+                end
+            end
+
+            if should_reschedule then
                 self:_insert_task(task)
             end
         end
