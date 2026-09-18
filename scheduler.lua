@@ -5,12 +5,14 @@ function Scheduler.new()
     return setmetatable({
         tasks = {},
         currentTime = 0,
-        paused = false
+        paused = false,
+        nextTaskId = 1
     }, Scheduler)
 end
 
 function Scheduler:add_task(callback, delay, interval, priority, args, tag)
     local task = {
+        id = self.nextTaskId,
         callback = callback,
         next_run = self.currentTime + (delay or 0),
         interval = interval,
@@ -19,8 +21,19 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag)
         args = args,
         tag = tag
     }
+    self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
     return task
+end
+
+function Scheduler:get_task_by_id(id)
+    if not id then return nil end
+    for _, task in ipairs(self.tasks) do
+        if task.id == id then
+            return task
+        end
+    end
+    return nil
 end
 
 function Scheduler:cancel_task(task)
@@ -119,6 +132,7 @@ end
 
 function Scheduler:clear()
     self.tasks = {}
+    self.nextTaskId = 1
 end
 
 function Scheduler:pending_tasks()

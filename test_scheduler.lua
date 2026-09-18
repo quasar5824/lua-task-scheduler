@@ -211,3 +211,18 @@ end, 0)
 for i = 1, 10 do dyn_sched:update(1) end
 print("Dynamic tasks run (should be 3): " .. #results)
 print("Final count correct: " .. (count == 3 and "Yes" or "No"))
+
+-- Test 20: Task ID and get_task_by_id
+print("Testing task IDs...")
+local id_sched = Scheduler.new()
+local t_id1 = id_sched:add_task(function() end, 1)
+local t_id2 = id_sched:add_task(function() end, 2)
+
+print("Task 1 ID correct: " .. (t_id1.id == 1 and "Yes" or "No"))
+print("Task 2 ID correct: " .. (t_id2.id == 2 and "Yes" or "No"))
+
+local found = id_sched:get_task_by_id(2)
+print("Task found by ID: " .. (found == t_id2 and "Yes" or "No"))
+
+local not_found = id_sched:get_task_by_id(99)
+print("Non-existent task not found: " .. (not_found == nil and "Yes" or "No"))
