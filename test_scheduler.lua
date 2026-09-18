@@ -226,3 +226,16 @@ print("Task found by ID: " .. (found == t_id2 and "Yes" or "No"))
 
 local not_found = id_sched:get_task_by_id(99)
 print("Non-existent task not found: " .. (not_found == nil and "Yes" or "No"))
+
+-- Test 21: get_time and set_time
+print("Testing get_time and set_time...")
+local time_sched = Scheduler.new()
+print("Initial time (should be 0): " .. time_sched:get_time())
+
+time_sched:set_time(100)
+print("Set time (should be 100): " .. time_sched:get_time())
+
+time_sched:add_task(function() end, 10)
+-- Task should be scheduled for 110
+local next_task = time_sched:peek_next_task()
+print("Next task run time (should be 110): " .. next_task.next_run)

@@ -10,6 +10,14 @@ function Scheduler.new()
     }, Scheduler)
 end
 
+function Scheduler:get_time()
+    return self.currentTime
+end
+
+function Scheduler:set_time(time)
+    self.currentTime = time or 0
+end
+
 function Scheduler:add_task(callback, delay, interval, priority, args, tag)
     local task = {
         id = self.nextTaskId,
