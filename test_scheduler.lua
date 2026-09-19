@@ -239,3 +239,23 @@ time_sched:add_task(function() end, 10)
 -- Task should be scheduled for 110
 local next_task = time_sched:peek_next_task()
 print("Next task run time (should be 110): " .. next_task.next_run)
+
+-- Test 22: execute_due
+print("Testing execute_due...")
+results = {}
+local ex_sched = Scheduler.new()
+ex_sched:add_task(function() results[#results+1] = "Due" end, 0)
+ex_sched:pause()
+-- update() would do nothing because it's paused, but execute_due should run it
+ex_sched:execute_due()
+print("Execute due while paused ran: " .. (results[1] == "Due" and "Yes" or "No"))
+
+-- Test 23: get_active_tasks
+print("Testing get_active_tasks...")
+local act_sched = Scheduler.new()
+act_sched:add_task(function() end, 1)
+local t_can_act = act_sched:add_task(function() end, 2)
+act_sched:cancel_task(t_can_act)
+local active = act_sched:get_active_tasks()
+print("Active tasks count (should be 1): " .. #active)
+print("Correct task is active: " .. (active[1] ~= t_can_act and "Yes" or "No"))

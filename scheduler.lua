@@ -166,6 +166,16 @@ function Scheduler:get_tasks()
     return copy
 end
 
+function Scheduler:get_active_tasks()
+    local active = {}
+    for _, task in ipairs(self.tasks) do
+        if not task.cancelled then
+            table.insert(active, task)
+        end
+    end
+    return active
+end
+
 function Scheduler:get_tasks_by_tag(tag)
     if not tag then return {}
     end
@@ -244,7 +254,10 @@ function Scheduler:update(deltaTime, maxExecutionTime)
     end
 
     self.currentTime = self.currentTime + deltaTime
-    
+    self:execute_due(maxExecutionTime)
+end
+
+function Scheduler:execute_due(maxExecutionTime)
     local startTime = os.clock()
     
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
