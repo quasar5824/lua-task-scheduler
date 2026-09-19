@@ -143,6 +143,10 @@ function Scheduler:clear()
     self.nextTaskId = 1
 end
 
+function Scheduler:remove_all_tasks()
+    self.tasks = {}
+end
+
 function Scheduler:pending_tasks()
     local count = 0
     for _, task in ipairs(self.tasks) do
