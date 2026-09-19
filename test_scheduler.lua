@@ -259,3 +259,15 @@ act_sched:cancel_task(t_can_act)
 local active = act_sched:get_active_tasks()
 print("Active tasks count (should be 1): " .. #active)
 print("Correct task is active: " .. (active[1] ~= t_can_act and "Yes" or "No"))
+
+-- Test 24: get_task_remaining_time
+print("Testing get_task_remaining_time...")
+local rem_sched = Scheduler.new()
+local t_rem = rem_sched:add_task(function() end, 10)
+print("Remaining time (should be 10): " .. rem_sched:get_task_remaining_time(t_rem))
+
+rem_sched:update(4)
+print("Remaining time after update (should be 6): " .. rem_sched:get_task_remaining_time(t_rem))
+
+rem_sched:update(7)
+print("Remaining time after overdue (should be 0): " .. rem_sched:get_task_remaining_time(t_rem))

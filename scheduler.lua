@@ -202,6 +202,11 @@ function Scheduler:peek_next_task()
     return nil
 end
 
+function Scheduler:get_task_remaining_time(task)
+    if not task then return nil end
+    return math.max(0, task.next_run - self.currentTime)
+end
+
 function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
