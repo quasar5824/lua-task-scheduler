@@ -192,6 +192,18 @@ function Scheduler:get_tasks_by_tag(tag)
     return filtered
 end
 
+function Scheduler:get_tasks_by_callback(callback)
+    if not callback then return {}
+    end
+    local filtered = {}
+    for _, task in ipairs(self.tasks) do
+        if task.callback == callback then
+            table.insert(filtered, task)
+        end
+    end
+    return filtered
+end
+
 function Scheduler:peek_next_task()
     -- Return the first non-cancelled task in the sorted list
     for i = 1, #self.tasks do

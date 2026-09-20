@@ -271,3 +271,21 @@ print("Remaining time after update (should be 6): " .. rem_sched:get_task_remain
 
 rem_sched:update(7)
 print("Remaining time after overdue (should be 0): " .. rem_sched:get_task_remaining_time(t_rem))
+
+-- Test 25: get_tasks_by_callback
+print("Testing get_tasks_by_callback...")
+local cb_sched = Scheduler.new()
+local func1 = function() end
+local func2 = function() end
+cb_sched:add_task(func1, 1)
+cb_sched:add_task(func1, 2)
+cb_sched:add_task(func2, 3)
+
+local found_func1 = cb_sched:get_tasks_by_callback(func1)
+print("Tasks for func1 found (should be 2): " .. #found_func1)
+
+local found_func2 = cb_sched:get_tasks_by_callback(func2)
+print("Tasks for func2 found (should be 1): " .. #found_func2)
+
+local found_none = cb_sched:get_tasks_by_callback(function() end)
+print("Tasks for unknown func found (should be 0): " .. #found_none)
