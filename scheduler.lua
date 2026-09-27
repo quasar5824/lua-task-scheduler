@@ -88,6 +88,21 @@ function Scheduler:remove_tasks_by_tag(tag)
     return count
 end
 
+function Scheduler:remove_tasks_by_callback(callback)
+    if not callback then return 0 end
+    local count = 0
+    local i = 1
+    while i <= #self.tasks do
+        if self.tasks[i].callback == callback then
+            table.remove(self.tasks, i)
+            count = count + 1
+        else
+            i = i + 1
+        end
+    end
+    return count
+end
+
 function Scheduler:reschedule_task(task, new_delay)
     if not task then return false end
     

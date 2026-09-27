@@ -289,3 +289,16 @@ print("Tasks for func2 found (should be 1): " .. #found_func2)
 
 local found_none = cb_sched:get_tasks_by_callback(function() end)
 print("Tasks for unknown func found (should be 0): " .. #found_none)
+
+-- Test 26: remove_tasks_by_callback
+print("Testing remove_tasks_by_callback...")
+local rm_cb_sched = Scheduler.new()
+local f_rem = function() end
+local f_keep = function() end
+rm_cb_sched:add_task(f_rem, 1)
+rm_cb_sched:add_task(f_rem, 2)
+rm_cb_sched:add_task(f_keep, 3)
+
+local removed_cb_count = rm_cb_sched:remove_tasks_by_callback(f_rem)
+print("Tasks removed by callback (should be 2): " .. removed_cb_count)
+print("Total tasks remaining (should be 1): " .. rm_cb_sched:total_tasks())
