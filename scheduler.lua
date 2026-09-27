@@ -239,6 +239,11 @@ function Scheduler:peek_next_task()
     return nil
 end
 
+function Scheduler:get_next_task_time()
+    local next_task = self:peek_next_task()
+    return next_task and next_task.next_run or nil
+end
+
 function Scheduler:get_task_remaining_time(task)
     if not task then return nil end
     return math.max(0, task.next_run - self.currentTime)
