@@ -103,6 +103,16 @@ end
 function Scheduler:update_task(task, updates)
     if not task or not updates then return false end
     
+    -- Validate that the task actually belongs to this scheduler
+    local exists = false
+    for _, t in ipairs(self.tasks) do
+        if t == task then
+            exists = true
+            break
+        end
+    end
+    if not exists then return false end
+
     local needs_reinsert = false
     
     if updates.delay then
