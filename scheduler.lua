@@ -26,6 +26,7 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag)
         interval = interval,
         priority = priority or 0,
         cancelled = false,
+        executed = false,
         args = args,
         tag = tag
     }
@@ -249,6 +250,15 @@ function Scheduler:get_task_remaining_time(task)
     return math.max(0, task.next_run - self.currentTime)
 end
 
+function Scheduler:get_task_status(task)
+    if not task then return nil end
+    if task.cancelled then return "cancelled"
+    end
+    if task.executed then return "executed"
+    end
+    return "pending"
+end
+
 function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
@@ -326,6 +336,8 @@ function Scheduler:execute_due(maxExecutionTime)
                 print("Task Scheduler Error: " .. tostring(result))
             end
             
+            task.executed = true
+
             -- Task control logic
             local should_reschedule = true
             

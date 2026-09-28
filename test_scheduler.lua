@@ -314,3 +314,17 @@ print("Next task time (should be 2): " .. tostring(nt_sched:get_next_task_time()
 local t_can = nt_sched:add_task(function() end, 1)
 nt_sched:cancel_task(t_can)
 print("Next task time after cancellation (should be 2): " .. tostring(nt_sched:get_next_task_time()))
+
+-- Test 28: Task status tracking
+print("Testing task status tracking...")
+local status_sched = Scheduler.new()
+local t_pend = status_sched:add_task(function() end, 10)
+local t_exec = status_sched:add_task(function() end, 0)
+local t_canc = status_sched:add_task(function() end, 5)
+
+status_sched:cancel_task(t_canc)
+status_sched:update(0)
+
+print("Pending status correct: " .. (status_sched:get_task_status(t_pend) == "pending" and "Yes" or "No"))
+print("Executed status correct: " .. (status_sched:get_task_status(t_exec) == "executed" and "Yes" or "No"))
+print("Cancelled status correct: " .. (status_sched:get_task_status(t_canc) == "cancelled" and "Yes" or "No"))
