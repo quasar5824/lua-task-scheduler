@@ -330,8 +330,8 @@ function Scheduler:execute_due(maxExecutionTime)
         local task = table.remove(self.tasks, 1)
         
         if not task.cancelled then
-            -- Pass currentTime and any provided arguments to the callback
-            local success, result = pcall(task.callback, self.currentTime, task.args)
+            -- Pass currentTime, task object, and any provided arguments to the callback
+            local success, result = pcall(task.callback, self.currentTime, task, task.args)
             if not success then
                 print("Task Scheduler Error: " .. tostring(result))
             end
