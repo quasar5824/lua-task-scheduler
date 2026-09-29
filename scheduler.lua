@@ -345,6 +345,9 @@ function Scheduler:execute_due(maxExecutionTime)
                 if result.cancel == true then
                     should_reschedule = false
                 end
+                if result.priority then
+                    task.priority = result.priority
+                end
                 if result.next_delay then
                     task.next_run = self.currentTime + result.next_delay
                 elseif task.interval then
@@ -354,11 +357,11 @@ function Scheduler:execute_due(maxExecutionTime)
                 task.next_run = self.currentTime + task.interval
             end
 
-            if should_reschedule and (task.interval or result) then
+            if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay)) then
                 -- If the task is not recurring and didn't provide a next_delay, don't reschedule
-                if not task.interval and (type(result) ~= "table" or not result.next_delay) then
-                    should_reschedule = false
-                end
+                -- We check if result is a table and has next_delay since that's the only other way to reschedule
+            elseif should_reschedule and not task.interval and (type(result) ~= "table" or not result.next_delay) then
+                should_reschedule = false
             end
 
             if should_reschedule then

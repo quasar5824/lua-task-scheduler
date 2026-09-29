@@ -328,3 +328,34 @@ status_sched:update(0)
 print("Pending status correct: " .. (status_sched:get_task_status(t_pend) == "pending" and "Yes" or "No"))
 print("Executed status correct: " .. (status_sched:get_task_status(t_exec) == "executed" and "Yes" or "No"))
 print("Cancelled status correct: " .. (status_sched:get_task_status(t_canc) == "cancelled" and "Yes" or "No"))
+
+-- Test 29: Dynamic priority change
+print("Testing dynamic priority change...")
+results = {}
+local dp_sched = Scheduler.new()
+local order = {}
+
+-- Task A: Low priority, runs first, then boosts itself
+-- Task B: Medium priority, runs second
+-- Task C: High priority, runs third
+-- All scheduled for T=0
+
+dp_sched:add_task(function(t, task)
+    table.insert(order, "A")
+    return { next_delay = 1, priority = 100 }
+end, 0, 1, 0)
+
+dp_sched:add_task(function(t, task)
+    table.insert(order, "B")
+end, 0, 1, 10)
+
+dp_sched:add_task(function(t, task)
+    table.insert(order, "C")
+end, 0, 1, 20)
+
+dp_sched:update(0)
+print("First run order: " .. table.concat(order, ", ")) -- Expected: C, B, A
+
+order = {}
+dp_sched:update(1)
+print("Second run order: " .. table.concat(order, ", ")) -- Expected: A, C, B (A is now priority 100)
