@@ -359,3 +359,16 @@ print("First run order: " .. table.concat(order, ", ")) -- Expected: C, B, A
 order = {}
 dp_sched:update(1)
 print("Second run order: " .. table.concat(order, ", ")) -- Expected: A, C, B (A is now priority 100)
+
+-- Test 30: wait_until
+print("Testing wait_until...")
+results = {}
+local w_sched = Scheduler.new()
+w_sched:wait_until(50, function(t) results[#results+1] = "Absolute at " .. t end)
+
+w_sched:update(40)
+print("Tasks run at T=40 (should be 0): " .. #results)
+
+w_sched:update(10)
+print("Tasks run at T=50 (should be 1): " .. #results)
+print("Wait until result: " .. (results[1] == "Absolute at 50" and "Success" or "Failure"))

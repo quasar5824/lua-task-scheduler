@@ -35,6 +35,23 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag)
     return task
 end
 
+function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag)
+    local task = {
+        id = self.nextTaskId,
+        callback = callback,
+        next_run = absoluteTime,
+        interval = interval,
+        priority = priority or 0,
+        cancelled = false,
+        executed = false,
+        args = args,
+        tag = tag
+    }
+    self.nextTaskId = self.nextTaskId + 1
+    self:_insert_task(task)
+    return task
+end
+
 function Scheduler:get_task_by_id(id)
     if not id then return nil end
     for _, task in ipairs(self.tasks) do
