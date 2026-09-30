@@ -411,10 +411,10 @@ function Scheduler:execute_due(maxExecutionTime)
                 if result.next_delay then
                     task.next_run = self.currentTime + result.next_delay
                 elseif task.interval then
-                    task.next_run = self.currentTime + task.interval
+                    task.next_run = task.next_run + task.interval
                 end
             elseif task.interval then
-                task.next_run = self.currentTime + task.interval
+                task.next_run = task.next_run + task.interval
             end
 
             if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay)) then
