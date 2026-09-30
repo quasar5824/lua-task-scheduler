@@ -35,6 +35,24 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag)
     return task
 end
 
+function Scheduler:add_tasks(task_list)
+    if type(task_list) ~= "table" then return {}
+    end
+    local added = {}
+    for _, t_data in ipairs(task_list) do
+        local task = self:add_task(
+            t_data.callback,
+            t_data.delay,
+            t_data.interval,
+            t_data.priority,
+            t_data.args,
+            t_data.tag
+        )
+        table.insert(added, task)
+    end
+    return added
+end
+
 function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag)
     local task = {
         id = self.nextTaskId,
@@ -62,6 +80,19 @@ function Scheduler:get_task_by_id(id)
     return nil
 end
 
+function Scheduler:get_task_details(task)
+    if not task then return nil end
+    return {
+        id = task.id,
+        next_run = task.next_run,
+        priority = task.priority,
+        interval = task.interval,
+        tag = task.tag,
+        status = self:get_task_status(task),
+        remaining = self:get_task_remaining_time(task)
+    }
+end
+
 function Scheduler:cancel_task(task)
     if task then
         task.cancelled = true
@@ -73,6 +104,18 @@ function Scheduler:cancel_tasks_by_tag(tag)
     local count = 0
     for _, task in ipairs(self.tasks) do
         if task.tag == tag then
+            task.cancelled = true
+            count = count + 1
+        end
+    end
+    return count
+end
+
+function Scheduler:cancel_tasks_by_callback(callback)
+    if not callback then return 0 end
+    local count = 0
+    for _, task in ipairs(self.tasks) do
+        if task.callback == callback then
             task.cancelled = true
             count = count + 1
         end
