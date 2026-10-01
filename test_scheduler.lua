@@ -372,3 +372,16 @@ print("Tasks run at T=40 (should be 0): " .. #results)
 w_sched:update(10)
 print("Tasks run at T=50 (should be 1): " .. #results)
 print("Wait until result: " .. (results[1] == "Absolute at 50" and "Success" or "Failure"))
+
+-- Test 31: Task Dependencies
+print("Testing dependencies...")
+results = {}
+local dep_sched = Scheduler.new()
+local t1 = dep_sched:add_task(function() results[#results+1] = "Task 1" end, 0)
+local t2 = dep_sched:add_task(function() results[#results+1] = "Task 2" end, 0)
+
+dep_sched:add_dependency(t2, t1)
+
+dep_sched:update(0)
+print("Order with dependency: " .. table.concat(results, ", "))
+print("Dependency result: " .. (results[1] == "Task 1" and results[2] == "Task 2" and "Success" or "Failure"))
