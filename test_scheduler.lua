@@ -396,3 +396,16 @@ count_sched:update(1)
 print("Execution count (should be 3): " .. t_count.execution_count)
 local details = count_sched:get_task_details(t_count)
 print("Details count correct: " .. (details.execution_count == 3 and "Yes" or "No"))
+
+-- Test 33: is_task_pending
+print("Testing is_task_pending...")
+local p_sched_pending = Scheduler.new()
+local t_pend = p_sched_pending:add_task(function() end, 10)
+print("Task initially pending (should be Yes): " .. (p_sched_pending:is_task_pending(t_pend) and "Yes" or "No"))
+
+p_sched_pending:cancel_task(t_pend)
+print("Task after cancel pending (should be No): " .. (p_sched_pending:is_task_pending(t_pend) and "Yes" or "No"))
+
+local t_exec = p_sched_pending:add_task(function() end, 0)
+p_sched_pending:update(0)
+print("Task after exec pending (should be No): " .. (p_sched_pending:is_task_pending(t_exec) and "Yes" or "No"))

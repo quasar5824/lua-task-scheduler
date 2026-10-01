@@ -333,6 +333,11 @@ function Scheduler:get_task_status(task)
     return "pending"
 end
 
+function Scheduler:is_task_pending(task)
+    if not task then return false end
+    return not task.cancelled and not task.executed
+end
+
 function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
