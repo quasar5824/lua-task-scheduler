@@ -27,6 +27,7 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag)
         priority = priority or 0,
         cancelled = false,
         executed = false,
+        execution_count = 0,
         args = args,
         tag = tag,
         dependencies = {}
@@ -63,6 +64,7 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         priority = priority or 0,
         cancelled = false,
         executed = false,
+        execution_count = 0,
         args = args,
         tag = tag,
         dependencies = {}
@@ -100,7 +102,8 @@ function Scheduler:get_task_details(task)
         interval = task.interval,
         tag = task.tag,
         status = self:get_task_status(task),
-        remaining = self:get_task_remaining_time(task)
+        remaining = self:get_task_remaining_time(task),
+        execution_count = task.execution_count
     }
 end
 
@@ -423,6 +426,7 @@ function Scheduler:execute_due(maxExecutionTime)
                 end
                 
                 task.executed = true
+                task.execution_count = task.execution_count + 1
 
                 -- Task control logic
                 local should_reschedule = true
