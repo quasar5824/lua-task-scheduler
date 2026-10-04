@@ -304,6 +304,18 @@ function Scheduler:get_tasks_by_callback(callback)
     return filtered
 end
 
+function Scheduler:get_tasks_by_priority_range(min, max)
+    local filtered = {}
+    local low = min or -math.huge
+    local high = max or math.huge
+    for _, task in ipairs(self.tasks) do
+        if task.priority >= low and task.priority <= high then
+            table.insert(filtered, task)
+        end
+    end
+    return filtered
+end
+
 function Scheduler:peek_next_task()
     -- Return the first non-cancelled task in the sorted list
     for i = 1, #self.tasks do
@@ -472,6 +484,11 @@ function Scheduler:execute_due(maxExecutionTime)
     for _, t in ipairs(tasksToReinsert) do
         self:_insert_task(t)
     end
+end
+
+function Scheduler:flush_due()
+    -- Executes all tasks that are due now, ignoring maxExecutionTime
+    self:execute_due(nil)
 end
 
 return Scheduler
