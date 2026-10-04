@@ -4,6 +4,7 @@ Scheduler.__index = Scheduler
 function Scheduler.new()
     return setmetatable({
         tasks = {},
+        groups = {},
         currentTime = 0,
         paused = false,
         nextTaskId = 1
@@ -31,7 +32,8 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         args = args,
         tag = tag,
         dependencies = {},
-        timeout = timeout
+        timeout = timeout,
+        groupId = nil
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -70,7 +72,8 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         args = args,
         tag = tag,
         dependencies = {},
-        timeout = timeout
+        timeout = timeout,
+        groupId = nil
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -248,11 +251,13 @@ end
 
 function Scheduler:clear()
     self.tasks = {}
+    self.groups = {}
     self.nextTaskId = 1
 end
 
 function Scheduler:remove_all_tasks()
     self.tasks = {}
+    self.groups = {}
 end
 
 function Scheduler:pending_tasks()
@@ -374,6 +379,19 @@ function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
         if self.tasks[i].cancelled then
+            -- If task belongs to a group, remove it from the group list too
+            if self.tasks[i].groupId then
+                local gid = self.tasks[i].groupId
+                local group = self.groups[gid]
+                if group then
+                    for j, t in ipairs(group.tasks) do
+                        if t == self.tasks[i] then
+                            table.remove(group.tasks, j)
+                            break
+                        end
+                    end
+                end
+            end
             table.remove(self.tasks, i)
         else
             i = i + 1
@@ -391,6 +409,80 @@ end
 
 function Scheduler:is_paused()
     return self.paused
+end
+
+-- Group Management --
+
+function Scheduler:create_group(groupId)
+    if not groupId then return nil end
+    self.groups[groupId] = {
+        tasks = {},
+        paused = false
+    }
+    return self.groups[groupId]
+end
+
+function Scheduler:add_task_to_group(task, groupId)
+    if not task or not groupId then return false end
+    if not self.groups[groupId] then
+        self:create_group(groupId)
+    end
+    
+    task.groupId = groupId
+    table.insert(self.groups[groupId].tasks, task)
+    return true
+end
+
+function Scheduler:remove_task_from_group(task)
+    if not task or not task.groupId then return false end
+    local group = self.groups[task.groupId]
+    if not group then return false end
+    
+    for i, t in ipairs(group.tasks) do
+        if t == task then
+            table.remove(group.tasks, i)
+            task.groupId = nil
+            return true
+        end
+    end
+    return false
+end
+
+function Scheduler:pause_group(groupId)
+    if self.groups[groupId] then
+        self.groups[groupId].paused = true
+        return true
+    end
+    return false
+end
+
+function Scheduler:resume_group(groupId)
+    if self.groups[groupId] then
+        self.groups[groupId].paused = false
+        return true
+    end
+    return false
+end
+
+function Scheduler:cancel_group(groupId)
+    if not self.groups[groupId] then return 0 end
+    local count = 0
+    for _, task in ipairs(self.groups[groupId].tasks) do
+        if not task.cancelled then
+            task.cancelled = true
+            count = count + 1
+        end
+    end
+    return count
+end
+
+function Scheduler:get_group_tasks(groupId)
+    if not self.groups[groupId] then return {} end
+    local copy = {}
+    for i, t in ipairs(self.groups[groupId].tasks) do
+        copy[i] = t
+    end
+    return copy
 end
 
 function Scheduler:_insert_task(task)
@@ -432,10 +524,6 @@ end
 function Scheduler:execute_due(maxExecutionTime)
     local startTime = os.clock()
     
-    -- We use a loop to check for due tasks. Since some tasks might be blocked by dependencies,
-    -- we may need to iterate several times or handle the queue carefully to avoid infinite loops
-    -- if tasks are mutually dependent (though that should be handled by user).
-    
     local tasksToReinsert = {}
     
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
@@ -446,77 +534,80 @@ function Scheduler:execute_due(maxExecutionTime)
         local task = table.remove(self.tasks, 1)
         
         if not task.cancelled then
-            -- Check for timeout
-            if task.timeout and (self.currentTime - (task.next_run - (task.interval or 0)) > task.timeout) then
-                task.cancelled = true
-                -- We don't re-insert timeout tasks
-            else
-                -- Check if dependencies are met
-                local deps_met = true
-                for _, dep in ipairs(task.dependencies) do
-                    if not dep.executed then
-                        deps_met = false
-                        break
-                    end
+            local group_paused = false
+            if task.groupId then
+                local group = self.groups[task.groupId]
+                if group and group.paused then
+                    group_paused = true
                 end
+            end
 
-                if deps_met then
-                    -- Pass currentTime, task object, and any provided arguments to the callback
-                    local success, result = pcall(task.callback, self.currentTime, task, task.args)
-                    if not success then
-                        print("Task Scheduler Error: " .. tostring(result))
+            if group_paused then
+                table.insert(tasksToReinsert, task)
+            else
+                if task.timeout and (self.currentTime - (task.next_run - (task.interval or 0)) > task.timeout) then
+                    task.cancelled = true
+                else
+                    local deps_met = true
+                    for _, dep in ipairs(task.dependencies) do
+                        if not dep.executed then
+                            deps_met = false
+                            break
+                        end
                     end
-                    
-                    task.executed = true
-                    task.execution_count = task.execution_count + 1
 
-                    -- Task control logic
-                    local should_reschedule = true
-                    
-                    if type(result) == "table" then
-                        if result.cancel == true then
-                            should_reschedule = false
+                    if deps_met then
+                        local success, result = pcall(task.callback, self.currentTime, task, task.args)
+                        if not success then
+                            print("Task Scheduler Error: " .. tostring(result))
                         end
-                        if result.repeat == false then
-                            task.interval = nil
-                        end
-                        if result.priority then
-                            task.priority = result.priority
-                        end
-                        if result.next_delay then
-                            task.next_run = self.currentTime + result.next_delay
+                        
+                        task.executed = true
+                        task.execution_count = task.execution_count + 1
+
+                        local should_reschedule = true
+                        if type(result) == "table" then
+                            if result.cancel == true then
+                                should_reschedule = false
+                            end
+                            if result.repeat == false then
+                                task.interval = nil
+                            end
+                            if result.priority then
+                                task.priority = result.priority
+                            end
+                            if result.next_delay then
+                                task.next_run = self.currentTime + result.next_delay
+                            elseif task.interval then
+                                task.next_run = task.next_run + task.interval
+                            end
                         elseif task.interval then
                             task.next_run = task.next_run + task.interval
                         end
-                    elseif task.interval then
-                        task.next_run = task.next_run + task.interval
-                    end
 
-                    if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay)) then
-                        -- Keep recurring
-                    elseif should_reschedule and not task.interval and (type(result) ~= "table" or not result.next_delay) then
-                        should_reschedule = false
-                    end
+                        if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay)) then
+                            -- Keep recurring
+                        elseif should_reschedule and not task.interval and (type(result) ~= "table" or not result.next_delay) then
+                            should_reschedule = false
+                        end
 
-                    if should_reschedule then
+                        if should_reschedule then
+                            table.insert(tasksToReinsert, task)
+                        end
+                    else
                         table.insert(tasksToReinsert, task)
                     end
-                else
-                    -- Dependencies not met, re-insert for later
-                    table.insert(tasksToReinsert, task)
                 end
             end
         end
     end
 
-    -- Re-insert tasks that were skipped or need to recur
     for _, t in ipairs(tasksToReinsert) do
         self:_insert_task(t)
     end
 end
 
 function Scheduler:flush_due()
-    -- Executes all tasks that are due now, ignoring maxExecutionTime
     self:execute_due(nil)
 end
 
