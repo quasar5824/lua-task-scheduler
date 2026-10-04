@@ -452,6 +452,9 @@ function Scheduler:execute_due(maxExecutionTime)
                     if result.cancel == true then
                         should_reschedule = false
                     end
+                    if result.repeat == false then
+                        task.interval = nil
+                    end
                     if result.priority then
                         task.priority = result.priority
                     end

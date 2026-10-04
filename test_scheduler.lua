@@ -409,3 +409,22 @@ print("Task after cancel pending (should be No): " .. (p_sched_pending:is_task_p
 local t_exec = p_sched_pending:add_task(function() end, 0)
 p_sched_pending:update(0)
 print("Task after exec pending (should be No): " .. (p_sched_pending:is_task_pending(t_exec) and "Yes" or "No"))
+
+-- Test 34: stop repeating recurring task via return
+print("Testing recurring to one-time conversion...")
+results = {}
+local stop_sched = Scheduler.new()
+local stop_count = 0
+stop_sched:add_task(function(t)
+    stop_count = stop_count + 1
+    results[#results+1] = "Run " .. stop_count
+    if stop_count == 2 then
+        return { repeat = false }
+    end
+end, 0, 1)
+
+stop_sched:update(0) -- Run 1
+stop_sched:update(1) -- Run 2, returns {repeat = false}
+stop_sched:update(1) -- Should not run again
+print("Total runs (should be 2): " .. #results)
+print("Stop repeating result: " .. (#results == 2 and "Success" or "Failure"))
