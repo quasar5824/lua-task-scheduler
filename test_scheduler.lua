@@ -428,3 +428,36 @@ stop_sched:update(1) -- Run 2, returns {repeat = false}
 stop_sched:update(1) -- Should not run again
 print("Total runs (should be 2): " .. #results)
 print("Stop repeating result: " .. (#results == 2 and "Success" or "Failure"))
+
+-- Test 35: Task Timeouts
+print("Testing task timeouts...")
+results = {}
+local timeout_sched = Scheduler.new()
+-- This task has a timeout of 5s
+local t_tout = timeout_sched:add_task(function() results[#results+1] = "Too late" end, 10, nil, 0, nil, nil, 5)
+
+-- Advance time to 17s. Task was scheduled for 10s, timeout is 5s. 
+-- It should have timed out at 15s.
+timeout_sched:update(17)
+print("Tasks run (should be 0): " .. #results)
+print("Task cancelled by timeout: " .. (t_tout.cancelled and "Yes" or "No"))
+
+-- Test 36: get_tasks_by_execution_range
+print("Testing get_tasks_by_execution_range...")
+local range_sched = Scheduler.new()
+local t_r1 = range_sched:add_task(function() end, 0, 1)
+local t_r2 = range_sched:add_task(function() end, 0, 1)
+local t_r3 = range_sched:add_task(function() end, 0, 1)
+
+range_sched:update(0) -- all: 1
+range_sched:update(1) -- all: 2
+range_sched:update(1) -- all: 3
+
+-- Manually change one to test filter
+t_r1.execution_count = 1
+
+local tasks_1_to_2 = range_sched:get_tasks_by_execution_range(1, 2)
+print("Tasks with exec count 1-2 (should be 1): " .. #tasks_1_to_2)
+
+local tasks_2_to_3 = range_sched:get_tasks_by_execution_range(2, 3)
+print("Tasks with exec count 2-3 (should be 2): " .. #tasks_2_to_3)

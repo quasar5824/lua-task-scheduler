@@ -18,7 +18,7 @@ function Scheduler:set_time(time)
     self.currentTime = time or 0
 end
 
-function Scheduler:add_task(callback, delay, interval, priority, args, tag)
+function Scheduler:add_task(callback, delay, interval, priority, args, tag, timeout)
     local task = {
         id = self.nextTaskId,
         callback = callback,
@@ -30,7 +30,8 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag)
         execution_count = 0,
         args = args,
         tag = tag,
-        dependencies = {}
+        dependencies = {},
+        timeout = timeout
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -48,14 +49,15 @@ function Scheduler:add_tasks(task_list)
             t_data.interval,
             t_data.priority,
             t_data.args,
-            t_data.tag
+            t_data.tag,
+            t_data.timeout
         )
         table.insert(added, task)
     end
     return added
 end
 
-function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag)
+function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag, timeout)
     local task = {
         id = self.nextTaskId,
         callback = callback,
@@ -67,7 +69,8 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         execution_count = 0,
         args = args,
         tag = tag,
-        dependencies = {}
+        dependencies = {},
+        timeout = timeout
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -103,7 +106,8 @@ function Scheduler:get_task_details(task)
         tag = task.tag,
         status = self:get_task_status(task),
         remaining = self:get_task_remaining_time(task),
-        execution_count = task.execution_count
+        execution_count = task.execution_count,
+        timeout = task.timeout
     }
 end
 
@@ -227,6 +231,10 @@ function Scheduler:update_task(task, updates)
         task.args = updates.args
     end
 
+    if updates.timeout then
+        task.timeout = updates.timeout
+    end
+
     if needs_reinsert then
         if self:remove_task(task) then
             self:_insert_task(task)
@@ -310,6 +318,18 @@ function Scheduler:get_tasks_by_priority_range(min, max)
     local high = max or math.huge
     for _, task in ipairs(self.tasks) do
         if task.priority >= low and task.priority <= high then
+            table.insert(filtered, task)
+        end
+    end
+    return filtered
+end
+
+function Scheduler:get_tasks_by_execution_range(min, max)
+    local filtered = {}
+    local low = min or 0
+    local high = max or math.huge
+    for _, task in ipairs(self.tasks) do
+        if task.execution_count >= low and task.execution_count <= high then
             table.insert(filtered, task)
         end
     end
@@ -426,59 +446,65 @@ function Scheduler:execute_due(maxExecutionTime)
         local task = table.remove(self.tasks, 1)
         
         if not task.cancelled then
-            -- Check if dependencies are met
-            local deps_met = true
-            for _, dep in ipairs(task.dependencies) do
-                if not dep.executed then
-                    deps_met = false
-                    break
+            -- Check for timeout
+            if task.timeout and (self.currentTime - (task.next_run - (task.interval or 0)) > task.timeout) then
+                task.cancelled = true
+                -- We don't re-insert timeout tasks
+            else
+                -- Check if dependencies are met
+                local deps_met = true
+                for _, dep in ipairs(task.dependencies) do
+                    if not dep.executed then
+                        deps_met = false
+                        break
+                    end
                 end
-            end
 
-            if deps_met then
-                -- Pass currentTime, task object, and any provided arguments to the callback
-                local success, result = pcall(task.callback, self.currentTime, task, task.args)
-                if not success then
-                    print("Task Scheduler Error: " .. tostring(result))
-                end
-                
-                task.executed = true
-                task.execution_count = task.execution_count + 1
+                if deps_met then
+                    -- Pass currentTime, task object, and any provided arguments to the callback
+                    local success, result = pcall(task.callback, self.currentTime, task, task.args)
+                    if not success then
+                        print("Task Scheduler Error: " .. tostring(result))
+                    end
+                    
+                    task.executed = true
+                    task.execution_count = task.execution_count + 1
 
-                -- Task control logic
-                local should_reschedule = true
-                
-                if type(result) == "table" then
-                    if result.cancel == true then
-                        should_reschedule = false
-                    end
-                    if result.repeat == false then
-                        task.interval = nil
-                    end
-                    if result.priority then
-                        task.priority = result.priority
-                    end
-                    if result.next_delay then
-                        task.next_run = self.currentTime + result.next_delay
+                    -- Task control logic
+                    local should_reschedule = true
+                    
+                    if type(result) == "table" then
+                        if result.cancel == true then
+                            should_reschedule = false
+                        end
+                        if result.repeat == false then
+                            task.interval = nil
+                        end
+                        if result.priority then
+                            task.priority = result.priority
+                        end
+                        if result.next_delay then
+                            task.next_run = self.currentTime + result.next_delay
+                        elseif task.interval then
+                            task.next_run = task.next_run + task.interval
+                        end
                     elseif task.interval then
                         task.next_run = task.next_run + task.interval
                     end
-                elseif task.interval then
-                    task.next_run = task.next_run + task.interval
-                end
 
-                if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay)) then
-                    -- Keep recurring
-                elseif should_reschedule and not task.interval and (type(result) ~= "table" or not result.next_delay) then
-                    should_reschedule = false
-                end
+                    if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay)) then
+                        -- Keep recurring
+                    elseif should_reschedule and not task.interval and (type(result) ~= "table" or not result.next_delay) then
+                        should_reschedule = false
+                    end
 
-                if should_reschedule then
+                    if should_reschedule then
+                        table.insert(tasksToReinsert, task)
+                    end
+                else
+                    -- Dependencies not met, re-insert for later
                     table.insert(tasksToReinsert, task)
                 end
-            else
-                -- Dependencies not met, re-insert for later
-                table.insert(tasksToReinsert, task)
             end
         end
     end
