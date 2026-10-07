@@ -461,3 +461,41 @@ print("Tasks with exec count 1-2 (should be 1): " .. #tasks_1_to_2)
 
 local tasks_2_to_3 = range_sched:get_tasks_by_execution_range(2, 3)
 print("Tasks with exec count 2-3 (should be 2): " .. #tasks_2_to_3)
+
+-- Test 37: on_complete callback
+print("Testing on_complete callback...")
+results = {}
+local comp_sched = Scheduler.new()
+local completed = false
+comp_sched:add_task(function(t)
+    results[#results+1] = "Task ran"
+    return "Finished"
+end, 0, nil, 0, nil, nil, nil, function(t, task, res)
+    completed = true
+    results[#results+1] = "Completed with " .. res
+end)
+
+comp_sched:update(0)
+print("Completion callback ran: " .. (completed and "Yes" or "No"))
+print("Results order: " .. table.concat(results, ", "))
+
+-- Test 38: Recurring on_complete (should NOT run until finally finished)
+print("Testing recurring on_complete...")
+results = {}
+completed = false
+comp_sched:clear()
+comp_sched:add_task(function(t)
+    results[#results+1] = "Tick"
+    if #results == 2 then
+        return { repeat = false }
+    end
+end, 0, 1, 0, nil, nil, nil, function(t, task, res)
+    completed = true
+    results[#results+1] = "Finally Done"
+end)
+
+comp_sched:update(0)
+print("Completed after tick 1 (should be No): " .. (completed and "Yes" or "No"))
+comp_sched:update(1)
+print("Completed after tick 2 (should be Yes): " .. (completed and "Yes" or "No"))
+print("Final results: " .. table.concat(results, ", "))

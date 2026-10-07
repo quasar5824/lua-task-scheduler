@@ -19,7 +19,7 @@ function Scheduler:set_time(time)
     self.currentTime = time or 0
 end
 
-function Scheduler:add_task(callback, delay, interval, priority, args, tag, timeout)
+function Scheduler:add_task(callback, delay, interval, priority, args, tag, timeout, on_complete)
     local task = {
         id = self.nextTaskId,
         callback = callback,
@@ -33,7 +33,9 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         tag = tag,
         dependencies = {},
         timeout = timeout,
-        groupId = nil
+        groupId = nil,
+        on_complete = on_complete,
+        last_result = nil
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -52,14 +54,15 @@ function Scheduler:add_tasks(task_list)
             t_data.priority,
             t_data.args,
             t_data.tag,
-            t_data.timeout
+            t_data.timeout,
+            t_data.on_complete
         )
         table.insert(added, task)
     end
     return added
 end
 
-function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag, timeout)
+function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag, timeout, on_complete)
     local task = {
         id = self.nextTaskId,
         callback = callback,
@@ -73,7 +76,9 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         tag = tag,
         dependencies = {},
         timeout = timeout,
-        groupId = nil
+        groupId = nil,
+        on_complete = on_complete,
+        last_result = nil
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -564,6 +569,7 @@ function Scheduler:execute_due(maxExecutionTime)
                         
                         task.executed = true
                         task.execution_count = task.execution_count + 1
+                        task.last_result = result
 
                         local should_reschedule = true
                         if type(result) == "table" then
@@ -589,6 +595,10 @@ function Scheduler:execute_due(maxExecutionTime)
                             -- Keep recurring
                         elseif should_reschedule and not task.interval and (type(result) ~= "table" or not result.next_delay) then
                             should_reschedule = false
+                        end
+
+                        if not should_reschedule and task.on_complete then
+                            pcall(task.on_complete, self.currentTime, task, result)
                         end
 
                         if should_reschedule then
