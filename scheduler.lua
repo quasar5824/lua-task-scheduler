@@ -621,4 +621,102 @@ function Scheduler:flush_due()
     self:execute_due(nil)
 end
 
+-- Serialization --
+
+function Scheduler:serialize(callback_map)
+    -- callback_map should be a table mapping function references to string IDs
+    local state = {
+        currentTime = self.currentTime,
+        paused = self.paused,
+        nextTaskId = self.nextTaskId,
+        groups = {},
+        tasks = {}
+    }
+
+    for groupId, group in pairs(self.groups) do
+        state.groups[groupId] = {
+            paused = group.paused
+        }
+    end
+
+    for _, task in ipairs(self.tasks) do
+        local callback_id = callback_map[task.callback]
+        if not callback_id then
+            -- We cannot serialize tasks with unknown callbacks
+            -- For this implementation, we skip them or mark as generic
+            callback_id = "unknown"
+        end
+
+        table.insert(state.tasks, {
+            id = task.id,
+            callback_id = callback_id,
+            next_run = task.next_run,
+            interval = task.interval,
+            priority = task.priority,
+            cancelled = task.cancelled,
+            executed = task.executed,
+            execution_count = task.execution_count,
+            args = task.args,
+            tag = task.tag,
+            timeout = task.timeout,
+            groupId = task.groupId,
+            last_result = task.last_result
+            -- Dependencies and callbacks are too complex for simple state serialization
+            -- without a full object graph, so they are omitted from basic serialization
+        })
+    end
+
+    return state
+end
+
+function Scheduler:deserialize(state, callback_map)
+    -- callback_map should be a table mapping string IDs to function references
+    if not state then return false end
+
+    self.currentTime = state.currentTime or 0
+    self.paused = state.paused or false
+    self.nextTaskId = state.nextTaskId or 1
+    self.tasks = {}
+    self.groups = {}
+
+    for groupId, group_state in pairs(state.groups or {}) do
+        self:create_group(groupId)
+        self.groups[groupId].paused = group_state.paused
+    end
+
+    for _, t_state in ipairs(state.tasks or {}) do
+        local callback = callback_map[t_state.callback_id]
+        if callback then
+            local task = {
+                id = t_state.id,
+                callback = callback,
+                next_run = t_state.next_run,
+                interval = t_state.interval,
+                priority = t_state.priority,
+                cancelled = t_state.cancelled,
+                executed = t_state.executed,
+                execution_count = t_state.execution_count,
+                args = t_state.args,
+                tag = t_state.tag,
+                dependencies = {},
+                timeout = t_state.timeout,
+                groupId = t_state.groupId,
+                on_complete = nil, -- Not serialized
+                last_result = t_state.last_result
+            }
+            
+            if task.groupId then
+                if not self.groups[task.groupId] then
+                    self:create_group(task.groupId)
+                end
+                table.insert(self.groups[task.groupId].tasks, task)
+            end
+
+            self:_insert_task(task)
+        end
+    end
+
+    return true
+end
+
 return Scheduler

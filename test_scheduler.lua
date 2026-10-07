@@ -499,3 +499,25 @@ print("Completed after tick 1 (should be No): " .. (completed and "Yes" or "No")
 comp_sched:update(1)
 print("Completed after tick 2 (should be Yes): " .. (completed and "Yes" or "No"))
 print("Final results: " .. table.concat(results, ", "))
+
+-- Test 39: Serialization
+print("Testing serialization...")
+results = {}
+local s_sched = Scheduler.new()
+local cb1 = function(t) results[#results+1] = "S-Task 1 at " .. t end
+local cb2 = function(t) results[#results+1] = "S-Task 2 at " .. t end
+
+s_sched:add_task(cb1, 1)
+s_sched:add_task(cb2, 2)
+
+local cb_map = { [cb1] = "task1", [cb2] = "task2" }
+local state = s_sched:serialize(cb_map)
+
+local new_sched = Scheduler.new()
+local rev_map = { task1 = cb1, task2 = cb2 }
+new_sched:deserialize(state, rev_map)
+
+print("Deserialized task count (should be 2): " .. new_sched:total_tasks())
+new_sched:update(2)
+print("Tasks run after deserialize (should be 2): " .. #results)
+print("Serialization result: " .. (#results == 2 and "Success" or "Failure"))
