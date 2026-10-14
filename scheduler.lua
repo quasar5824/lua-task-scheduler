@@ -670,8 +670,9 @@ function Scheduler:weighted_select_due()
             end
             
             if deps_met then
-                table.insert(due_tasks, task)
-                total_weight = total_weight + (task.weight or 1)
+                local w = task.weight or 1
+                table.insert(due_tasks, {task = task, weight = w})
+                total_weight = total_weight + w
             end
         end
     end
@@ -681,14 +682,14 @@ function Scheduler:weighted_select_due()
     local random_val = math.random() * total_weight
     local current_sum = 0
     
-    for _, task in ipairs(due_tasks) do
-        current_sum = current_sum + (task.weight or 1)
+    for _, entry in ipairs(due_tasks) do
+        current_sum = current_sum + entry.weight
         if random_val <= current_sum then
-            return task
+            return entry.task
         end
     end
     
-    return due_tasks[#due_tasks]
+    return due_tasks[#due_tasks].task
 end
 
 -- Serialization --

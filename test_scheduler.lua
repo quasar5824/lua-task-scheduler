@@ -592,3 +592,20 @@ g_sched:add_task_to_group(t5, "group2")
 g_sched:cancel_group("group2")
 g_sched:update(0)
 print("Tasks run after G2 cancelled (should be 0): " .. #results)
+
+-- Test 43: Weighted Selection
+print("Testing weighted selection...")
+results = {}
+local w_sched_select = Scheduler.new()
+local t_heavy = w_sched_select:add_task(function() end, 0, nil, 0, nil, nil, nil, nil, 100)
+local t_light = w_sched_select:add_task(function() end, 0, nil, 0, nil, nil, nil, nil, 1)
+
+local heavy_count = 0
+local light_count = 0
+for i = 1, 100 do
+    local selected = w_sched_select:weighted_select_due()
+    if selected == t_heavy then heavy_count = heavy_count + 1
+    elseif selected == t_light then light_count = light_count + 1 end
+end
+print("Weighted selection (Heavy: " .. heavy_count .. ", Light: " .. light_count .. ")")
+print("Heavier task selected more often: " .. (heavy_count > light_count and "Yes" or "No"))
