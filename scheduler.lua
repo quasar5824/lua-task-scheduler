@@ -7,7 +7,11 @@ function Scheduler.new()
         groups = {},
         currentTime = 0,
         paused = false,
-        nextTaskId = 1
+        nextTaskId = 1,
+        stats = {
+            total_executions = 0,
+            total_execution_time = 0
+        }
     }, Scheduler)
 end
 
@@ -36,7 +40,9 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         groupId = nil,
         on_complete = on_complete,
         last_result = nil,
-        weight = weight or 1
+        weight = weight or 1,
+        last_execution_time = 0,
+        avg_execution_time = 0
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -81,7 +87,9 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         groupId = nil,
         on_complete = on_complete,
         last_result = nil,
-        weight = weight or 1
+        weight = weight or 1,
+        last_execution_time = 0,
+        avg_execution_time = 0
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -119,7 +127,9 @@ function Scheduler:get_task_details(task)
         remaining = self:get_task_remaining_time(task),
         execution_count = task.execution_count,
         timeout = task.timeout,
-        weight = task.weight
+        weight = task.weight,
+        last_execution_time = task.last_execution_time,
+        avg_execution_time = task.avg_execution_time
     }
 end
 
@@ -266,6 +276,10 @@ function Scheduler:clear()
     self.tasks = {}
     self.groups = {}
     self.nextTaskId = 1
+    self.stats = {
+        total_executions = 0,
+        total_execution_time = 0
+    }
 end
 
 function Scheduler:remove_all_tasks()
@@ -570,11 +584,21 @@ function Scheduler:execute_due(maxExecutionTime)
                     end
 
                     if deps_met then
+                        local task_start = os.clock()
                         local success, result = pcall(task.callback, self.currentTime, task, task.args)
+                        local task_end = os.clock()
+                        local duration = task_end - task_start
+
                         if not success then
                             print("Task Scheduler Error: " .. tostring(result))
                         end
                         
+                        -- Update performance metrics
+                        task.last_execution_time = duration
+                        task.avg_execution_time = (task.avg_execution_time * task.execution_count + duration) / (task.execution_count + 1)
+                        self.stats.total_executions = self.stats.total_executions + 1
+                        self.stats.total_execution_time = self.stats.total_execution_time + duration
+
                         task.executed = true
                         task.execution_count = task.execution_count + 1
                         task.last_result = result
@@ -676,7 +700,8 @@ function Scheduler:serialize(callback_map)
         paused = self.paused,
         nextTaskId = self.nextTaskId,
         groups = {},
-        tasks = {}
+        tasks = {},
+        stats = self.stats
     }
 
     for groupId, group in pairs(self.groups) do
@@ -707,7 +732,9 @@ function Scheduler:serialize(callback_map)
             timeout = task.timeout,
             groupId = task.groupId,
             last_result = task.last_result,
-            weight = task.weight
+            weight = task.weight,
+            last_execution_time = task.last_execution_time,
+            avg_execution_time = task.avg_execution_time
             -- Dependencies and callbacks are too complex for simple state serialization
             -- without a full object graph, so they are omitted from basic serialization
         })
@@ -725,6 +752,10 @@ function Scheduler:deserialize(state, callback_map)
     self.nextTaskId = state.nextTaskId or 1
     self.tasks = {}
     self.groups = {}
+    self.stats = state.stats or {
+        total_executions = 0,
+        total_execution_time = 0
+    }
 
     for groupId, group_state in pairs(state.groups or {}) do
         self:create_group(groupId)
@@ -750,7 +781,9 @@ function Scheduler:deserialize(state, callback_map)
                 groupId = t_state.groupId,
                 on_complete = nil, -- Not serialized
                 last_result = t_state.last_result,
-                weight = t_state.weight or 1
+                weight = t_state.weight or 1,
+                last_execution_time = t_state.last_execution_time or 0,
+                avg_execution_time = t_state.avg_execution_time or 0
             }
             
             if task.groupId then
@@ -765,6 +798,18 @@ function Scheduler:deserialize(state, callback_map)
     end
 
     return true
+end
+
+function Scheduler:get_performance_report()
+    local total_execs = self.stats.total_executions
+    local total_time = self.stats.total_execution_time
+    
+    return {
+        total_executions = total_execs,
+        total_execution_time = total_time,
+        average_execution_time = total_execs > 0 and (total_time / total_execs) or 0,
+        active_tasks = self:pending_tasks()
+    }
 end
 
 return Scheduler

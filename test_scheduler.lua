@@ -537,3 +537,23 @@ local f_sched = Scheduler.new()
  f_sched:flush_due()
  print("Tasks run after update and flush_due (should be 3): " .. #results)
  print("Flush result: " .. (#results == 3 and "Success" or "Failure"))
+
+-- Test 41: Performance Tracking
+print("Testing performance tracking...")
+local perf_sched = Scheduler.new()
+perf_sched:add_task(function() 
+    local s = os.clock()
+    while os.clock() - s < 0.02 do end
+end, 0)
+perf_sched:add_task(function() 
+    local s = os.clock()
+    while os.clock() - s < 0.01 do end
+end, 0)
+perf_sched:update(0)
+
+local report = perf_sched:get_performance_report()
+print("Total executions (should be 2): " .. report.total_executions)
+print("Avg time should be ~0.015: " .. report.average_execution_time)
+
+local t_perf = perf_sched:get_tasks()[1]
+print("Task 1 avg time tracked: " .. (t_perf.avg_execution_time > 0 and "Yes" or "No"))
