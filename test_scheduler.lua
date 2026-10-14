@@ -557,3 +557,38 @@ print("Avg time should be ~0.015: " .. report.average_execution_time)
 
 local t_perf = perf_sched:get_tasks()[1]
 print("Task 1 avg time tracked: " .. (t_perf.avg_execution_time > 0 and "Yes" or "No"))
+
+-- Test 42: Group Management
+print("Testing group management...")
+results = {}
+local g_sched = Scheduler.new()
+
+local t1 = g_sched:add_task(function() results[#results+1] = "G1-T1" end, 0)
+local t2 = g_sched:add_task(function() results[#results+1] = "G1-T2" end, 0)
+local t3 = g_sched:add_task(function() results[#results+1] = "Other" end, 0)
+
+g_sched:add_task_to_group(t1, "group1")
+g_sched:add_task_to_group(t2, "group1")
+
+-- Pause group 1
+g_sched:pause_group("group1")
+g_sched:update(0)
+print("Tasks run while G1 paused (should be 1): " .. #results)
+print("Correct task ran: " .. (results[1] == "Other" and "Yes" or "No"))
+
+-- Resume group 1
+results = {}
+g_sched:resume_group("group1")
+g_sched:update(0)
+print("Tasks run after G1 resume (should be 2): " .. #results)
+
+-- Test group cancellation
+results = {}
+local t4 = g_sched:add_task(function() results[#results+1] = "G2-T1" end, 0)
+local t5 = g_sched:add_task(function() results[#results+1] = "G2-T2" end, 0)
+g_sched:add_task_to_group(t4, "group2")
+g_sched:add_task_to_group(t5, "group2")
+
+g_sched:cancel_group("group2")
+g_sched:update(0)
+print("Tasks run after G2 cancelled (should be 0): " .. #results)
