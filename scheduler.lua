@@ -19,7 +19,7 @@ function Scheduler:set_time(time)
     self.currentTime = time or 0
 end
 
-function Scheduler:add_task(callback, delay, interval, priority, args, tag, timeout, on_complete)
+function Scheduler:add_task(callback, delay, interval, priority, args, tag, timeout, on_complete, weight)
     local task = {
         id = self.nextTaskId,
         callback = callback,
@@ -35,7 +35,8 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         timeout = timeout,
         groupId = nil,
         on_complete = on_complete,
-        last_result = nil
+        last_result = nil,
+        weight = weight or 1
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -55,14 +56,15 @@ function Scheduler:add_tasks(task_list)
             t_data.args,
             t_data.tag,
             t_data.timeout,
-            t_data.on_complete
+            t_data.on_complete,
+            t_data.weight
         )
         table.insert(added, task)
     end
     return added
 end
 
-function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag, timeout, on_complete)
+function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, tag, timeout, on_complete, weight)
     local task = {
         id = self.nextTaskId,
         callback = callback,
@@ -78,7 +80,8 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         timeout = timeout,
         groupId = nil,
         on_complete = on_complete,
-        last_result = nil
+        last_result = nil,
+        weight = weight or 1
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -115,7 +118,8 @@ function Scheduler:get_task_details(task)
         status = self:get_task_status(task),
         remaining = self:get_task_remaining_time(task),
         execution_count = task.execution_count,
-        timeout = task.timeout
+        timeout = task.timeout,
+        weight = task.weight
     }
 end
 
@@ -241,6 +245,10 @@ function Scheduler:update_task(task, updates)
 
     if updates.timeout then
         task.timeout = updates.timeout
+    end
+
+    if updates.weight then
+        task.weight = updates.weight
     end
 
     if needs_reinsert then
@@ -621,6 +629,44 @@ function Scheduler:flush_due()
     self:execute_due(nil)
 end
 
+-- Weighted Selection --
+
+function Scheduler:weighted_select_due()
+    local due_tasks = {}
+    local total_weight = 0
+    
+    for _, task in ipairs(self.tasks) do
+        if not task.cancelled and task.next_run <= self.currentTime then
+            local deps_met = true
+            for _, dep in ipairs(task.dependencies) do
+                if not dep.executed then
+                    deps_met = false
+                    break
+                end
+            end
+            
+            if deps_met then
+                table.insert(due_tasks, task)
+                total_weight = total_weight + (task.weight or 1)
+            end
+        end
+    end
+    
+    if #due_tasks == 0 then return nil end
+    
+    local random_val = math.random() * total_weight
+    local current_sum = 0
+    
+    for _, task in ipairs(due_tasks) do
+        current_sum = current_sum + (task.weight or 1)
+        if random_val <= current_sum then
+            return task
+        end
+    end
+    
+    return due_tasks[#due_tasks]
+end
+
 -- Serialization --
 
 function Scheduler:serialize(callback_map)
@@ -660,7 +706,8 @@ function Scheduler:serialize(callback_map)
             tag = task.tag,
             timeout = task.timeout,
             groupId = task.groupId,
-            last_result = task.last_result
+            last_result = task.last_result,
+            weight = task.weight
             -- Dependencies and callbacks are too complex for simple state serialization
             -- without a full object graph, so they are omitted from basic serialization
         })
@@ -702,7 +749,8 @@ function Scheduler:deserialize(state, callback_map)
                 timeout = t_state.timeout,
                 groupId = t_state.groupId,
                 on_complete = nil, -- Not serialized
-                last_result = t_state.last_result
+                last_result = t_state.last_result,
+                weight = t_state.weight or 1
             }
             
             if task.groupId then
