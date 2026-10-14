@@ -521,3 +521,19 @@ print("Deserialized task count (should be 2): " .. new_sched:total_tasks())
 new_sched:update(2)
 print("Tasks run after deserialize (should be 2): " .. #results)
 print("Serialization result: " .. (#results == 2 and "Success" or "Failure"))
+
+-- Test 40: flush_due
+print("Testing flush_due...")
+results = {}
+local f_sched = Scheduler.new()
+ f_sched:add_task(function() results[#results+1] = "Flush 1" end, 0)
+ f_sched:add_task(function() results[#results+1] = "Flush 2" end, 0)
+ f_sched:add_task(function() results[#results+1] = "Flush 3" end, 1)
+
+ f_sched:flush_due()
+ print("Tasks run after flush_due (should be 2): " .. #results)
+
+ f_sched:update(1)
+ f_sched:flush_due()
+ print("Tasks run after update and flush_due (should be 3): " .. #results)
+ print("Flush result: " .. (#results == 3 and "Success" or "Failure"))
