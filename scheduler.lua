@@ -539,22 +539,27 @@ function Scheduler:_insert_task(task)
     table.insert(self.tasks, low, task)
 end
 
-function Scheduler:update(deltaTime, maxExecutionTime)
+function Scheduler:update(deltaTime, maxExecutionTime, maxTasks)
     if self.paused then
         return
     end
 
     self.currentTime = self.currentTime + deltaTime
-    self:execute_due(maxExecutionTime)
+    self:execute_due(maxExecutionTime, maxTasks)
 end
 
-function Scheduler:execute_due(maxExecutionTime)
+function Scheduler:execute_due(maxExecutionTime, maxTasks)
     local startTime = os.clock()
+    local tasksExecuted = 0
     
     local tasksToReinsert = {}
     
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
         if maxExecutionTime and (os.clock() - startTime) > maxExecutionTime then
+            break
+        end
+
+        if maxTasks and tasksExecuted >= maxTasks then
             break
         end
 
@@ -602,6 +607,7 @@ function Scheduler:execute_due(maxExecutionTime)
                         task.executed = true
                         task.execution_count = task.execution_count + 1
                         task.last_result = result
+                        tasksExecuted = tasksExecuted + 1
 
                         local should_reschedule = true
                         if type(result) == "table" then

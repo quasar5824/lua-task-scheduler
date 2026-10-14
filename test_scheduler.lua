@@ -609,3 +609,18 @@ for i = 1, 100 do
 end
 print("Weighted selection (Heavy: " .. heavy_count .. ", Light: " .. light_count .. ")")
 print("Heavier task selected more often: " .. (heavy_count > light_count and "Yes" or "No"))
+
+-- Test 44: Max Tasks Limit
+print("Testing max tasks limit...")
+results = {}
+local mt_sched = Scheduler.new()
+for i = 1, 5 do
+    mt_sched:add_task(function(t) results[#results+1] = "T" .. i end, 0)
+end
+
+mt_sched:update(0, nil, 3)
+print("Tasks run with limit 3 (should be 3): " .. #results)
+
+mt_sched:update(0, nil, 3)
+print("Tasks run in second update (should be 2 more): " .. #results)
+print("Max tasks result: " .. (#results == 5 and "Success" or "Failure"))
