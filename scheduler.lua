@@ -1,6 +1,12 @@
 local Scheduler = {}
 Scheduler.__index = Scheduler
 
+-- Default logger
+local default_logger = {
+    log = function(msg) print("Task Scheduler: " .. msg) end,
+    error = function(msg) print("Task Scheduler ERROR: " .. msg) end
+}
+
 function Scheduler.new()
     return setmetatable({
         tasks = {},
@@ -8,11 +14,20 @@ function Scheduler.new()
         currentTime = 0,
         paused = false,
         nextTaskId = 1,
+        logger = default_logger,
         stats = {
             total_executions = 0,
             total_execution_time = 0
         }
     }, Scheduler)
+end
+
+function Scheduler:set_logger(logger)
+    if type(logger) == "table" and logger.log and logger.error then
+        self.logger = logger
+    else
+        self.logger = default_logger
+    end
 end
 
 function Scheduler:get_time()
@@ -644,7 +659,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                         local duration = task_end - task_start
 
                         if not success then
-                            print("Task Scheduler Error: " .. tostring(result))
+                            self.logger.error("Task Scheduler Error: " .. tostring(result))
                         end
                         
                         -- Update performance metrics
