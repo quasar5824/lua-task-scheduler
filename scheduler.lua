@@ -719,6 +719,10 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
     end
 end
 
+function Scheduler:execute_all_due()
+    self:execute_due(nil, nil)
+end
+
 function Scheduler:flush_due()
     self:execute_due(nil)
 end

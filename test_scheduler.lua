@@ -624,3 +624,16 @@ print("Tasks run with limit 3 (should be 3): " .. #results)
 mt_sched:update(0, nil, 3)
 print("Tasks run in second update (should be 2 more): " .. #results)
 print("Max tasks result: " .. (#results == 5 and "Success" or "Failure"))
+
+-- Test 45: execute_all_due
+print("Testing execute_all_due...")
+results = {}
+local all_sched = Scheduler.new()
+for i = 1, 10 do
+    all_sched:add_task(function(t) results[#results+1] = "All" .. i end, 0)
+end
+
+-- Use execute_all_due to bypass any potential limits (though none set here)
+all_sched:execute_all_due()
+print("Tasks run with execute_all_due (should be 10): " .. #results)
+print("Execute all result: " .. (#results == 10 and "Success" or "Failure"))
