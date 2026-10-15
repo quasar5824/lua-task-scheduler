@@ -167,7 +167,13 @@ function Scheduler:remove_task(task)
     if not task then return end
     for i = 1, #self.tasks do
         if self.tasks[i] == task then
-            table.remove(self.tasks, i)
+            -- Replace with last element and re-heapify
+            local last = table.remove(self.tasks)
+            if i <= #self.tasks then
+                self.tasks[i] = last
+                self:_sift_up(i)
+                self:_sift_down(i)
+            end
             return true
         end
     end
@@ -180,8 +186,9 @@ function Scheduler:remove_tasks_by_tag(tag)
     local i = 1
     while i <= #self.tasks do
         if self.tasks[i].tag == tag then
-            table.remove(self.tasks, i)
+            self:remove_task(self.tasks[i])
             count = count + 1
+            -- remove_task may have changed current index, but loop will handle
         else
             i = i + 1
         end
@@ -195,7 +202,7 @@ function Scheduler:remove_tasks_by_callback(callback)
     local i = 1
     while i <= #self.tasks do
         if self.tasks[i].callback == callback then
-            table.remove(self.tasks, i)
+            self:remove_task(self.tasks[i])
             count = count + 1
         else
             i = i + 1
@@ -207,7 +214,6 @@ end
 function Scheduler:reschedule_task(task, new_delay)
     if not task then return false end
     
-    -- To maintain the sorted order of the task list, we must remove and re-insert
     if self:remove_task(task) then
         task.next_run = self.currentTime + (new_delay or 0)
         self:_insert_task(task)
@@ -219,7 +225,6 @@ end
 function Scheduler:update_task(task, updates)
     if not task or not updates then return false end
     
-    -- Validate that the task actually belongs to this scheduler
     local exists = false
     for _, t in ipairs(self.tasks) do
         if t == task then
@@ -302,7 +307,6 @@ function Scheduler:total_tasks()
 end
 
 function Scheduler:get_tasks()
-    -- Return a copy of the tasks table to avoid external modification of the queue structure
     local copy = {}
     for i, task in ipairs(self.tasks) do
         copy[i] = task
@@ -369,13 +373,21 @@ function Scheduler:get_tasks_by_execution_range(min, max)
 end
 
 function Scheduler:peek_next_task()
-    -- Return the first non-cancelled task in the sorted list
-    for i = 1, #self.tasks do
-        if not self.tasks[i].cancelled then
-            return self.tasks[i]
+    -- In a heap, the top is at index 1. However, it might be cancelled.
+    -- To correctly peek the next non-cancelled task without modifying the heap,
+    -- we must search. For efficiency, we can't simply peek index 1 if it's cancelled.
+    -- However, execute_due will eventually prune it. 
+    -- To maintain API compatibility: we search the heap for the one with minimum next_run
+    local best = nil
+    for _, task in ipairs(self.tasks) do
+        if not task.cancelled then
+            if not best or task.next_run < best.next_run or 
+               (task.next_run == best.next_run and task.priority > best.priority) then
+                best = task
+            end
         end
     end
-    return nil
+    return best
 end
 
 function Scheduler:get_next_task_time()
@@ -406,7 +418,6 @@ function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
         if self.tasks[i].cancelled then
-            -- If task belongs to a group, remove it from the group list too
             if self.tasks[i].groupId then
                 local gid = self.tasks[i].groupId
                 local group = self.groups[gid]
@@ -419,7 +430,7 @@ function Scheduler:prune_cancelled()
                     end
                 end
             end
-            table.remove(self.tasks, i)
+            self:remove_task(self.tasks[i])
         else
             i = i + 1
         end
@@ -513,30 +524,63 @@ function Scheduler:get_group_tasks(groupId)
 end
 
 function Scheduler:_insert_task(task)
-    local low = 1
-    local high = #self.tasks
-    
-    while low <= high do
-        local mid = math.floor((low + high) / 2)
-        local other = self.tasks[mid]
+    table.insert(self.tasks, task)
+    self:_sift_up(#self.tasks)
+end
+
+function Scheduler:_sift_up(idx)
+    local task = self.tasks[idx]
+    while idx > 1 do
+        local parentIdx = math.floor(idx / 2)
+        local parent = self.tasks[parentIdx]
         
-        local should_come_before = false
-        if task.next_run < other.next_run then
-            should_come_before = true
-        elseif task.next_run == other.next_run then
-            if task.priority > other.priority then
-                should_come_before = true
-            end
-        end
-        
-        if should_come_before then
-            high = mid - 1
+        if self:_compare_tasks(task, parent) then
+            self.tasks[idx] = parent
+            idx = parentIdx
         else
-            low = mid + 1
+            break
         end
     end
-    
-    table.insert(self.tasks, low, task)
+    self.tasks[idx] = task
+end
+
+function Scheduler:_sift_down(idx)
+    local count = #self.tasks
+    local task = self.tasks[idx]
+    while true do
+        local left = 2 * idx
+        local right = 2 * idx + 1
+        local smallest = nil
+
+        if left <= count then
+            smallest = self.tasks[left]
+        end
+
+        if right <= count then
+            local rightTask = self.tasks[right]
+            if not smallest or self:_compare_tasks(rightTask, smallest) then
+                smallest = rightTask
+            end
+        end
+
+        if smallest and self:_compare_tasks(smallest, task) then
+            local smallestIdx = (smallest == self.tasks[2 * idx]) and (2 * idx) or (2 * idx + 1)
+            self.tasks[idx] = smallest
+            idx = smallestIdx
+        else
+            break
+        end
+    end
+    self.tasks[idx] = task
+end
+
+function Scheduler:_compare_tasks(a, b)
+    if a.next_run < b.next_run then
+        return true
+    elseif a.next_run == b.next_run then
+        return a.priority > b.priority
+    end
+    return false
 end
 
 function Scheduler:update(deltaTime, maxExecutionTime, maxTasks)
@@ -563,7 +607,12 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
             break
         end
 
+        -- Pop root
         local task = table.remove(self.tasks, 1)
+        if #self.tasks > 0 then
+            self.tasks[1] = table.remove(self.tasks)
+            self:_sift_down(1)
+        end
         
         if not task.cancelled then
             local group_paused = false
@@ -720,8 +769,6 @@ function Scheduler:serialize(callback_map)
     for _, task in ipairs(self.tasks) do
         local callback_id = callback_map[task.callback]
         if not callback_id then
-            -- We cannot serialize tasks with unknown callbacks
-            -- For this implementation, we skip them or mark as generic
             callback_id = "unknown"
         end
 
@@ -742,8 +789,6 @@ function Scheduler:serialize(callback_map)
             weight = task.weight,
             last_execution_time = task.last_execution_time,
             avg_execution_time = task.avg_execution_time
-            -- Dependencies and callbacks are too complex for simple state serialization
-            -- without a full object graph, so they are omitted from basic serialization
         })
     end
 
