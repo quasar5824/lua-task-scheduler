@@ -182,10 +182,10 @@ function Scheduler:remove_task(task)
     if not task then return end
     for i = 1, #self.tasks do
         if self.tasks[i] == task then
-            -- Replace with last element and re-heapify
             local last = table.remove(self.tasks)
             if i <= #self.tasks then
                 self.tasks[i] = last
+                -- The new element at index i might need to move up or down
                 self:_sift_up(i)
                 self:_sift_down(i)
             end
@@ -203,7 +203,6 @@ function Scheduler:remove_tasks_by_tag(tag)
         if self.tasks[i].tag == tag then
             self:remove_task(self.tasks[i])
             count = count + 1
-            -- remove_task may have changed current index, but loop will handle
         else
             i = i + 1
         end
@@ -388,11 +387,6 @@ function Scheduler:get_tasks_by_execution_range(min, max)
 end
 
 function Scheduler:peek_next_task()
-    -- In a heap, the top is at index 1. However, it might be cancelled.
-    -- To correctly peek the next non-cancelled task without modifying the heap,
-    -- we must search. For efficiency, we can't simply peek index 1 if it's cancelled.
-    -- However, execute_due will eventually prune it. 
-    -- To maintain API compatibility: we search the heap for the one with minimum next_run
     local best = nil
     for _, task in ipairs(self.tasks) do
         if not task.cancelled then
