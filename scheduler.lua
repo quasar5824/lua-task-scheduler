@@ -565,22 +565,20 @@ function Scheduler:_sift_down(idx)
     while true do
         local left = 2 * idx
         local right = 2 * idx + 1
-        local smallest = nil
+        local smallestIdx = nil
 
         if left <= count then
-            smallest = self.tasks[left]
+            smallestIdx = left
         end
 
         if right <= count then
-            local rightTask = self.tasks[right]
-            if not smallest or self:_compare_tasks(rightTask, smallest) then
-                smallest = rightTask
+            if not smallestIdx or self:_compare_tasks(self.tasks[right], self.tasks[smallestIdx]) then
+                smallestIdx = right
             end
         end
 
-        if smallest and self:_compare_tasks(smallest, task) then
-            local smallestIdx = (smallest == self.tasks[2 * idx]) and (2 * idx) or (2 * idx + 1)
-            self.tasks[idx] = smallest
+        if smallestIdx and self:_compare_tasks(self.tasks[smallestIdx], task) then
+            self.tasks[idx] = self.tasks[smallestIdx]
             idx = smallestIdx
         else
             break
