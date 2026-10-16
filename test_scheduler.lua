@@ -637,3 +637,28 @@ end
 all_sched:execute_all_due()
 print("Tasks run with execute_all_due (should be 10): " .. #results)
 print("Execute all result: " .. (#results == 10 and "Success" or "Failure"))
+
+-- Test 46: Dynamic Priority via Return
+print("Testing dynamic priority via return...")
+results = {}
+local dp_ret_sched = Scheduler.new()
+local task_order = {}
+
+dp_ret_sched:add_task(function(t)
+    table.insert(task_order, "Low")
+    return { priority = 100, next_delay = 1 }
+end, 0, 1, 0)
+
+dp_ret_sched:add_task(function(t)
+    table.insert(task_order, "High")
+end, 0, 1, 10)
+
+dp_ret_sched:update(0)
+-- Order should be High (10) then Low (0)
+print("Run 1 order: " .. table.concat(task_order, ", "))
+
+task_order = {}
+dp_ret_sched:update(1)
+-- Order should be Low (now 100) then High (10)
+print("Run 2 order: " .. table.concat(task_order, ", "))
+print("Dynamic priority result: " .. (task_order[1] == "Low" and "Success" or "Failure"))
