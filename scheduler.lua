@@ -853,6 +853,7 @@ function Scheduler:deserialize(state, callback_map)
                 if not self.groups[task.groupId] then
                     self:create_group(task.groupId)
                 end
+                -- Re-establish the group membership link
                 table.insert(self.groups[task.groupId].tasks, task)
             end
 
