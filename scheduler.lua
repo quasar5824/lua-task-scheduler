@@ -876,4 +876,20 @@ function Scheduler:get_performance_report()
     }
 end
 
+function Scheduler:get_state_snapshot()
+    local snapshot = {
+        time = self.currentTime,
+        paused = self.paused,
+        stats = { 
+            total_executions = self.stats.total_executions, 
+            total_execution_time = self.stats.total_execution_time 
+        },
+        tasks = {}
+    }
+    for _, task in ipairs(self.tasks) do
+        table.insert(snapshot.tasks, self:get_task_details(task))
+    end
+    return snapshot
+end
+
 return Scheduler
