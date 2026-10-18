@@ -692,7 +692,10 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                         end
 
                         if not should_reschedule and task.on_complete then
-                            pcall(task.on_complete, self.currentTime, task, result)
+                            local comp_success, comp_err = pcall(task.on_complete, self.currentTime, task, result)
+                            if not comp_success then
+                                self.logger.error("Task Scheduler on_complete Error: " .. tostring(comp_err))
+                            end
                         end
 
                         if should_reschedule then
