@@ -185,7 +185,7 @@ function Scheduler:remove_task(task)
             local last = table.remove(self.tasks)
             if i <= #self.tasks then
                 self.tasks[i] = last
-                -- The new element at index i might need to move up or down
+                -- Re-heapify from the point of replacement
                 self:_sift_up(i)
                 self:_sift_down(i)
             end
@@ -444,20 +444,20 @@ end
 function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
-        if self.tasks[i].cancelled then
-            if self.tasks[i].groupId then
-                local gid = self.tasks[i].groupId
-                local group = self.groups[gid]
+        local task = self.tasks[i]
+        if task.cancelled then
+            if task.groupId then
+                local group = self.groups[task.groupId]
                 if group then
                     for j, t in ipairs(group.tasks) do
-                        if t == self.tasks[i] then
+                        if t == task then
                             table.remove(group.tasks, j)
                             break
                         end
                     end
                 end
             end
-            self:remove_task(self.tasks[i])
+            self:remove_task(task)
         else
             i = i + 1
         end
