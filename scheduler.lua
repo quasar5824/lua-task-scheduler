@@ -386,6 +386,24 @@ function Scheduler:get_tasks_by_execution_range(min, max)
     return filtered
 end
 
+function Scheduler:filter_tasks(predicate)
+    if type(predicate) ~= "function" then return self:get_tasks() end
+    local filtered = {}
+    for _, task in ipairs(self.tasks) do
+        if predicate(task) then
+            table.insert(filtered, task)
+        end
+    end
+    return filtered
+end
+
+function Scheduler:sort_tasks(compare_func)
+    local sorted = self:get_tasks()
+    if type(compare_func) ~= "function" then return sorted end
+    table.sort(sorted, compare_func)
+    return sorted
+end
+
 function Scheduler:peek_next_task()
     local best = nil
     for _, task in ipairs(self.tasks) do
