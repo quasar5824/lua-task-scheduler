@@ -673,9 +673,12 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
         end
 
         -- Pop root
-        local task = table.remove(self.tasks, 1)
-        if #self.tasks > 0 then
-            self.tasks[1] = table.remove(self.tasks)
+        local task = self.tasks[1]
+        if #self.tasks == 1 then
+            table.remove(self.tasks)
+        else
+            self.tasks[1] = self.tasks[#self.tasks]
+            table.remove(self.tasks)
             self:_sift_down(1)
         end
 
