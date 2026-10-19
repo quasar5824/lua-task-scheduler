@@ -419,7 +419,7 @@ stop_sched:add_task(function(t)
     stop_count = stop_count + 1
     results[#results+1] = "Run " .. stop_count
     if stop_count == 2 then
-        return { repeat = false }
+        return { ["repeat"] = false }
     end
 end, 0, 1)
 
@@ -487,7 +487,7 @@ comp_sched:clear()
 comp_sched:add_task(function(t)
     results[#results+1] = "Tick"
     if #results == 2 then
-        return { repeat = false }
+        return { ["repeat"] = false }
     end
 end, 0, 1, 0, nil, nil, nil, function(t, task, res)
     completed = true

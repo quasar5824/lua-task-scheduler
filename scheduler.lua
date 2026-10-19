@@ -179,15 +179,32 @@ function Scheduler:cancel_tasks_by_callback(callback)
 end
 
 function Scheduler:remove_task(task)
-    if not task then return end
+    if not task then return false end
     for i = 1, #self.tasks do
         if self.tasks[i] == task then
+            -- Keep group bookkeeping in sync with the heap.
+            if task.groupId then
+                local group = self.groups[task.groupId]
+                if group then
+                    for j = #group.tasks, 1, -1 do
+                        if group.tasks[j] == task then
+                            table.remove(group.tasks, j)
+                            break
+                        end
+                    end
+                end
+                task.groupId = nil
+            end
+
             local last = table.remove(self.tasks)
             if i <= #self.tasks then
                 self.tasks[i] = last
-                -- Re-heapify from the point of replacement
-                self:_sift_up(i)
-                self:_sift_down(i)
+                local parentIdx = math.floor(i / 2)
+                if i > 1 and self:_compare_tasks(last, self.tasks[parentIdx]) then
+                    self:_sift_up(i)
+                else
+                    self:_sift_down(i)
+                end
             end
             return true
         end
@@ -227,10 +244,14 @@ end
 
 function Scheduler:reschedule_task(task, new_delay)
     if not task then return false end
-    
+
+    local groupId = task.groupId
     if self:remove_task(task) then
         task.next_run = self.currentTime + (new_delay or 0)
         self:_insert_task(task)
+        if groupId then
+            self:add_task_to_group(task, groupId)
+        end
         return true
     end
     return false
@@ -238,7 +259,7 @@ end
 
 function Scheduler:update_task(task, updates)
     if not task or not updates then return false end
-    
+
     local exists = false
     for _, t in ipairs(self.tasks) do
         if t == task then
@@ -249,45 +270,49 @@ function Scheduler:update_task(task, updates)
     if not exists then return false end
 
     local needs_reinsert = false
-    
-    if updates.delay then
+
+    if updates.delay ~= nil then
         task.next_run = self.currentTime + updates.delay
         needs_reinsert = true
     end
-    
-    if updates.priority then
+
+    if updates.priority ~= nil then
         task.priority = updates.priority
         needs_reinsert = true
     end
-    
-    if updates.interval then
+
+    if updates.interval ~= nil then
         task.interval = updates.interval
     end
-    
-    if updates.tag then
+
+    if updates.tag ~= nil then
         task.tag = updates.tag
     end
-    
-    if updates.args then
+
+    if updates.args ~= nil then
         task.args = updates.args
     end
 
-    if updates.timeout then
+    if updates.timeout ~= nil then
         task.timeout = updates.timeout
     end
 
-    if updates.weight then
+    if updates.weight ~= nil then
         task.weight = updates.weight
     end
 
     if needs_reinsert then
+        local groupId = task.groupId
         if self:remove_task(task) then
             self:_insert_task(task)
+            if groupId then
+                self:add_task_to_group(task, groupId)
+            end
             return true
         end
         return false
     end
-    
+
     return true
 end
 
@@ -444,20 +469,8 @@ end
 function Scheduler:prune_cancelled()
     local i = 1
     while i <= #self.tasks do
-        local task = self.tasks[i]
-        if task.cancelled then
-            if task.groupId then
-                local group = self.groups[task.groupId]
-                if group then
-                    for j, t in ipairs(group.tasks) do
-                        if t == task then
-                            table.remove(group.tasks, j)
-                            break
-                        end
-                    end
-                end
-            end
-            self:remove_task(task)
+        if self.tasks[i].cancelled then
+            self:remove_task(self.tasks[i])
         else
             i = i + 1
         end
@@ -480,6 +493,9 @@ end
 
 function Scheduler:create_group(groupId)
     if not groupId then return nil end
+    if self.groups[groupId] then
+        return self.groups[groupId]
+    end
     self.groups[groupId] = {
         tasks = {},
         paused = false
@@ -489,10 +505,20 @@ end
 
 function Scheduler:add_task_to_group(task, groupId)
     if not task or not groupId then return false end
+    if task.groupId and task.groupId ~= groupId then
+        self:remove_task_from_group(task)
+    end
     if not self.groups[groupId] then
         self:create_group(groupId)
     end
-    
+
+    for _, existing in ipairs(self.groups[groupId].tasks) do
+        if existing == task then
+            task.groupId = groupId
+            return true
+        end
+    end
+
     task.groupId = groupId
     table.insert(self.groups[groupId].tasks, task)
     return true
@@ -502,7 +528,7 @@ function Scheduler:remove_task_from_group(task)
     if not task or not task.groupId then return false end
     local group = self.groups[task.groupId]
     if not group then return false end
-    
+
     for i, t in ipairs(group.tasks) do
         if t == task then
             table.remove(group.tasks, i)
@@ -571,7 +597,7 @@ function Scheduler:_sift_up(idx)
     while idx > 1 do
         local parentIdx = math.floor(idx / 2)
         local parent = self.tasks[parentIdx]
-        
+
         if self:_compare_tasks(task, parent) then
             self.tasks[idx] = parent
             idx = parentIdx
@@ -614,7 +640,10 @@ function Scheduler:_compare_tasks(a, b)
     if a.next_run < b.next_run then
         return true
     elseif a.next_run == b.next_run then
-        return a.priority > b.priority
+        if a.priority ~= b.priority then
+            return a.priority > b.priority
+        end
+        return (a.id or 0) < (b.id or 0)
     end
     return false
 end
@@ -631,9 +660,9 @@ end
 function Scheduler:execute_due(maxExecutionTime, maxTasks)
     local startTime = os.clock()
     local tasksExecuted = 0
-    
+
     local tasksToReinsert = {}
-    
+
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
         if maxExecutionTime and (os.clock() - startTime) > maxExecutionTime then
             break
@@ -649,7 +678,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
             self.tasks[1] = table.remove(self.tasks)
             self:_sift_down(1)
         end
-        
+
         if not task.cancelled then
             local group_paused = false
             if task.groupId then
@@ -682,7 +711,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                         if not success then
                             self.logger.error("Task Scheduler Error: " .. tostring(result))
                         end
-                        
+
                         -- Update performance metrics
                         task.last_execution_time = duration
                         task.avg_execution_time = (task.avg_execution_time * task.execution_count + duration) / (task.execution_count + 1)
@@ -699,13 +728,13 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                             if result.cancel == true then
                                 should_reschedule = false
                             end
-                            if result.repeat == false then
+                            if result["repeat"] == false then
                                 task.interval = nil
                             end
-                            if result.priority then
+                            if result.priority ~= nil then
                                 task.priority = result.priority
                             end
-                            if result.next_delay then
+                            if result.next_delay ~= nil then
                                 task.next_run = self.currentTime + result.next_delay
                             elseif task.interval then
                                 task.next_run = task.next_run + task.interval
@@ -714,9 +743,9 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                             task.next_run = task.next_run + task.interval
                         end
 
-                        if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay)) then
+                        if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay ~= nil)) then
                             -- Keep recurring
-                        elseif should_reschedule and not task.interval and (type(result) ~= "table" or not result.next_delay) then
+                        elseif should_reschedule and not task.interval and (type(result) ~= "table" or result.next_delay == nil) then
                             should_reschedule = false
                         end
 
@@ -756,7 +785,7 @@ end
 function Scheduler:weighted_select_due()
     local due_tasks = {}
     local total_weight = 0
-    
+
     for _, task in ipairs(self.tasks) do
         if not task.cancelled and task.next_run <= self.currentTime then
             local deps_met = true
@@ -766,7 +795,7 @@ function Scheduler:weighted_select_due()
                     break
                 end
             end
-            
+
             if deps_met then
                 local w = task.weight or 1
                 table.insert(due_tasks, {task = task, weight = w})
@@ -774,19 +803,19 @@ function Scheduler:weighted_select_due()
             end
         end
     end
-    
+
     if #due_tasks == 0 then return nil end
-    
+
     local random_val = math.random() * total_weight
     local current_sum = 0
-    
+
     for _, entry in ipairs(due_tasks) do
         current_sum = current_sum + entry.weight
         if random_val <= current_sum then
             return entry.task
         end
     end
-    
+
     return due_tasks[#due_tasks].task
 end
 
@@ -880,7 +909,7 @@ function Scheduler:deserialize(state, callback_map)
                 last_execution_time = t_state.last_execution_time or 0,
                 avg_execution_time = t_state.avg_execution_time or 0
             }
-            
+
             if task.groupId then
                 if not self.groups[task.groupId] then
                     self:create_group(task.groupId)
@@ -899,7 +928,7 @@ end
 function Scheduler:get_performance_report()
     local total_execs = self.stats.total_executions
     local total_time = self.stats.total_execution_time
-    
+
     return {
         total_executions = total_execs,
         total_execution_time = total_time,
@@ -912,9 +941,9 @@ function Scheduler:get_state_snapshot()
     local snapshot = {
         time = self.currentTime,
         paused = self.paused,
-        stats = { 
-            total_executions = self.stats.total_executions, 
-            total_execution_time = self.stats.total_execution_time 
+        stats = {
+            total_executions = self.stats.total_executions,
+            total_execution_time = self.stats.total_execution_time
         },
         tasks = {}
     }
