@@ -550,6 +550,17 @@ function Scheduler:get_group_tasks(groupId)
     return copy
 end
 
+function Scheduler:get_group_active_count(groupId)
+    if not self.groups[groupId] then return 0 end
+    local count = 0
+    for _, task in ipairs(self.groups[groupId].tasks) do
+        if not task.cancelled then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 function Scheduler:_insert_task(task)
     table.insert(self.tasks, task)
     self:_sift_up(#self.tasks)
