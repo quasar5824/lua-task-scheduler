@@ -130,7 +130,7 @@ print("Peeked task after cancellation is correct: " .. (peeked == t_later and "Y
 print("Testing pause/resume...")
 results = {}
 local p_sched_pause = Scheduler.new()
-p_sched_pause:add_task(function(t) results[#results+1] = "Paused Task at " .. t end, 1)
+p_sched_pause:add_task(function(t) results[#results+1] = "Paused Task at " .. t end, 0)
 
 p_sched_pause:pause()
 p_sched_pause:update(2)

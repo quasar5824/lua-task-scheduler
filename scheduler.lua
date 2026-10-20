@@ -434,10 +434,20 @@ function Scheduler:peek_next_task()
     local best = nil
     for _, task in ipairs(self.tasks) do
         if not task.cancelled then
-            if not best or task.next_run < best.next_run or 
-               (task.next_run == best.next_run and task.priority > best.priority) or
-               (task.next_run == best.next_run and task.priority == best.priority and task.id < best.id) then
-                best = task
+            local group_paused = false
+            if task.groupId then
+                local group = self.groups[task.groupId]
+                if group and group.paused then
+                    group_paused = true
+                end
+            end
+
+            if not group_paused then
+                if not best or task.next_run < best.next_run or 
+                   (task.next_run == best.next_run and task.priority > best.priority) or
+                   (task.next_run == best.next_run and task.priority == best.priority and task.id < best.id) then
+                    best = task
+                end
             end
         end
     end
