@@ -159,7 +159,7 @@ function Scheduler:cancel_tasks_by_tag(tag)
     if not tag then return 0 end
     local count = 0
     for _, task in ipairs(self.tasks) do
-        if task.tag == tag then
+        if task.tag == tag and not task.cancelled then
             task.cancelled = true
             count = count + 1
         end
@@ -171,7 +171,7 @@ function Scheduler:cancel_tasks_by_callback(callback)
     if not callback then return 0 end
     local count = 0
     for _, task in ipairs(self.tasks) do
-        if task.callback == callback then
+        if task.callback == callback and not task.cancelled then
             task.cancelled = true
             count = count + 1
         end

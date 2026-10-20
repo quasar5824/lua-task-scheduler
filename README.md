@@ -9,7 +9,7 @@ local Scheduler = require("scheduler")
 local sched = Scheduler.new()
 
 -- Add a task to run after 2 seconds
-sched:add_task(function(currentTime, args)
+sched:add_task(function(currentTime, task, args)
     print("Hello " .. args.name .. " at " .. currentTime)
 end, 2, nil, 0, {name = "World"})
 
@@ -36,7 +36,7 @@ end
 - `remove_tasks_by_tag(tag)`: Immediately removes all tasks with the given tag.
 - `reschedule_task(task, new_delay)`: Changes the execution time of a task.
 - `update_task(task, updates)`: Updates task properties (delay, priority, etc.).
-- `update(deltaTime, maxExecutionTime)`: Advances clock and executes due tasks. `maxExecutionTime` limits execution budget.
+- `update(deltaTime, maxExecutionTime, maxTasks)`: Advances clock and executes due tasks. `maxExecutionTime` limits execution budget and `maxTasks` limits the number of tasks executed.
 - `execute_due(maxExecutionTime)`: Manually triggers execution of due tasks.
 - `prune_cancelled()`: Removes cancelled tasks from the internal list.
 - `clear()`: Removes all tasks and resets task IDs.
