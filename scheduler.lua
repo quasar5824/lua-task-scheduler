@@ -435,7 +435,8 @@ function Scheduler:peek_next_task()
     for _, task in ipairs(self.tasks) do
         if not task.cancelled then
             if not best or task.next_run < best.next_run or 
-               (task.next_run == best.next_run and task.priority > best.priority) then
+               (task.next_run == best.next_run and task.priority > best.priority) or
+               (task.next_run == best.next_run and task.priority == best.priority and task.id < best.id) then
                 best = task
             end
         end
@@ -528,7 +529,10 @@ end
 function Scheduler:remove_task_from_group(task)
     if not task or not task.groupId then return false end
     local group = self.groups[task.groupId]
-    if not group then return false end
+    if not group then
+        task.groupId = nil
+        return false
+    end
 
     for i, t in ipairs(group.tasks) do
         if t == task then
@@ -537,6 +541,7 @@ function Scheduler:remove_task_from_group(task)
             return true
         end
     end
+    task.groupId = nil
     return false
 end
 
@@ -665,11 +670,11 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
     local tasksToReinsert = {}
 
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
-        if maxExecutionTime and (os.clock() - startTime) > maxExecutionTime then
+        if maxExecutionTime ~= nil and (os.clock() - startTime) > maxExecutionTime then
             break
         end
 
-        if maxTasks and tasksExecuted >= maxTasks then
+        if maxTasks ~= nil and tasksExecuted >= maxTasks then
             break
         end
 
@@ -681,6 +686,10 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
             self.tasks[1] = self.tasks[#self.tasks]
             table.remove(self.tasks)
             self:_sift_down(1)
+        end
+
+        if task.cancelled then
+            self:remove_task_from_group(task)
         end
 
         if not task.cancelled then
@@ -695,12 +704,13 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
             if group_paused then
                 table.insert(tasksToReinsert, task)
             else
-                if task.timeout and (self.currentTime - (task.next_run - (task.interval or 0)) > task.timeout) then
+                if task.timeout and (self.currentTime - task.next_run > task.timeout) then
                     task.cancelled = true
+                    self:remove_task_from_group(task)
                 else
                     local deps_met = true
                     for _, dep in ipairs(task.dependencies) do
-                        if not dep.executed then
+                        if dep ~= task and not dep.executed then
                             deps_met = false
                             break
                         end
@@ -731,6 +741,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                         if type(result) == "table" then
                             if result.cancel == true then
                                 should_reschedule = false
+                                task.cancelled = true
                             end
                             if result["repeat"] == false then
                                 task.interval = nil
@@ -751,6 +762,14 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                             -- Keep recurring
                         elseif should_reschedule and not task.interval and (type(result) ~= "table" or result.next_delay == nil) then
                             should_reschedule = false
+                        end
+
+                        if task.cancelled then
+                            should_reschedule = false
+                        end
+
+                        if not should_reschedule then
+                            self:remove_task_from_group(task)
                         end
 
                         if not should_reschedule and task.on_complete then
@@ -803,7 +822,7 @@ function Scheduler:weighted_select_due()
             if not group_paused then
                 local deps_met = true
                 for _, dep in ipairs(task.dependencies) do
-                    if not dep.executed then
+                    if dep ~= task and not dep.executed then
                         deps_met = false
                         break
                     end
