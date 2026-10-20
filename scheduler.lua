@@ -113,6 +113,7 @@ end
 
 function Scheduler:add_dependency(task, dependencyTask)
     if not task or not dependencyTask then return false end
+    if task == dependencyTask then return false end
     for _, dep in ipairs(task.dependencies) do
         if dep == dependencyTask then return true end
     end
@@ -791,18 +792,28 @@ function Scheduler:weighted_select_due()
 
     for _, task in ipairs(self.tasks) do
         if not task.cancelled and task.next_run <= self.currentTime then
-            local deps_met = true
-            for _, dep in ipairs(task.dependencies) do
-                if not dep.executed then
-                    deps_met = false
-                    break
+            local group_paused = false
+            if task.groupId then
+                local group = self.groups[task.groupId]
+                if group and group.paused then
+                    group_paused = true
                 end
             end
 
-            if deps_met then
-                local w = task.weight or 1
-                table.insert(due_tasks, {task = task, weight = w})
-                total_weight = total_weight + w
+            if not group_paused then
+                local deps_met = true
+                for _, dep in ipairs(task.dependencies) do
+                    if not dep.executed then
+                        deps_met = false
+                        break
+                    end
+                end
+
+                if deps_met then
+                    local w = task.weight or 1
+                    table.insert(due_tasks, {task = task, weight = w})
+                    total_weight = total_weight + w
+                end
             end
         end
     end
