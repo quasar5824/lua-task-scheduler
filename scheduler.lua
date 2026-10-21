@@ -55,7 +55,7 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         groupId = nil,
         on_complete = on_complete,
         last_result = nil,
-        weight = weight or 1,
+        weight = (weight == nil) and 1 or weight,
         last_execution_time = 0,
         avg_execution_time = 0
     }
@@ -102,7 +102,7 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         groupId = nil,
         on_complete = on_complete,
         last_result = nil,
-        weight = weight or 1,
+        weight = (weight == nil) and 1 or weight,
         last_execution_time = 0,
         avg_execution_time = 0
     }
@@ -181,22 +181,10 @@ end
 
 function Scheduler:remove_task(task)
     if not task then return false end
+    self:remove_task_from_group(task)
+
     for i = 1, #self.tasks do
         if self.tasks[i] == task then
-            -- Keep group bookkeeping in sync with the heap.
-            if task.groupId then
-                local group = self.groups[task.groupId]
-                if group then
-                    for j = #group.tasks, 1, -1 do
-                        if group.tasks[j] == task then
-                            table.remove(group.tasks, j)
-                            break
-                        end
-                    end
-                end
-                task.groupId = nil
-            end
-
             local last = table.remove(self.tasks)
             if i <= #self.tasks then
                 self.tasks[i] = last
@@ -714,7 +702,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
             if group_paused then
                 table.insert(tasksToReinsert, task)
             else
-                if task.timeout and (self.currentTime - task.next_run > task.timeout) then
+                if task.timeout ~= nil and (self.currentTime - task.next_run > task.timeout) then
                     task.cancelled = true
                     self:remove_task_from_group(task)
                 else
@@ -761,16 +749,16 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                             end
                             if result.next_delay ~= nil then
                                 task.next_run = self.currentTime + result.next_delay
-                            elseif task.interval then
+                            elseif task.interval ~= nil then
                                 task.next_run = task.next_run + task.interval
                             end
-                        elseif task.interval then
+                        elseif task.interval ~= nil then
                             task.next_run = task.next_run + task.interval
                         end
 
-                        if should_reschedule and (task.interval or (type(result) == "table" and result.next_delay ~= nil)) then
+                        if should_reschedule and (task.interval ~= nil or (type(result) == "table" and result.next_delay ~= nil)) then
                             -- Keep recurring
-                        elseif should_reschedule and not task.interval and (type(result) ~= "table" or result.next_delay == nil) then
+                        elseif should_reschedule and task.interval == nil and (type(result) ~= "table" or result.next_delay == nil) then
                             should_reschedule = false
                         end
 
@@ -839,7 +827,7 @@ function Scheduler:weighted_select_due()
                 end
 
                 if deps_met then
-                    local w = task.weight or 1
+                    local w = (task.weight == nil) and 1 or task.weight
                     table.insert(due_tasks, {task = task, weight = w})
                     total_weight = total_weight + w
                 end
@@ -948,7 +936,7 @@ function Scheduler:deserialize(state, callback_map)
                 groupId = t_state.groupId,
                 on_complete = nil, -- Not serialized
                 last_result = t_state.last_result,
-                weight = t_state.weight or 1,
+                weight = (t_state.weight == nil) and 1 or t_state.weight,
                 last_execution_time = t_state.last_execution_time or 0,
                 avg_execution_time = t_state.avg_execution_time or 0
             }
