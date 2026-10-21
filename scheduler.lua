@@ -737,7 +737,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
 
                         local should_reschedule = true
                         if type(result) == "table" then
-                            if result.cancel == true then
+                            if result.cancel then
                                 should_reschedule = false
                                 task.cancelled = true
                             end
@@ -836,6 +836,10 @@ function Scheduler:weighted_select_due()
     end
 
     if #due_tasks == 0 then return nil end
+
+    table.sort(due_tasks, function(a, b)
+        return (a.task.id or 0) < (b.task.id or 0)
+    end)
 
     local random_val = math.random() * total_weight
     local current_sum = 0
