@@ -89,7 +89,7 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
     local task = {
         id = self.nextTaskId,
         callback = callback,
-        next_run = absoluteTime,
+        next_run = (absoluteTime == nil) and self.currentTime or absoluteTime,
         interval = interval,
         priority = priority or 0,
         cancelled = false,
@@ -431,10 +431,20 @@ function Scheduler:peek_next_task()
             end
 
             if not group_paused then
-                if not best or task.next_run < best.next_run or 
-                   (task.next_run == best.next_run and task.priority > best.priority) or
-                   (task.next_run == best.next_run and task.priority == best.priority and task.id < best.id) then
-                    best = task
+                local deps_met = true
+                for _, dep in ipairs(task.dependencies) do
+                    if dep ~= task and not dep.executed then
+                        deps_met = false
+                        break
+                    end
+                end
+
+                if deps_met then
+                    if not best or task.next_run < best.next_run or 
+                       (task.next_run == best.next_run and task.priority > best.priority) or
+                       (task.next_run == best.next_run and task.priority == best.priority and task.id < best.id) then
+                        best = task
+                    end
                 end
             end
         end
@@ -657,7 +667,7 @@ function Scheduler:update(deltaTime, maxExecutionTime, maxTasks)
         return
     end
 
-    self.currentTime = self.currentTime + deltaTime
+    self.currentTime = self.currentTime + (deltaTime or 0)
     self:execute_due(maxExecutionTime, maxTasks)
 end
 
@@ -864,7 +874,10 @@ function Scheduler:serialize(callback_map)
         nextTaskId = self.nextTaskId,
         groups = {},
         tasks = {},
-        stats = self.stats
+        stats = {
+            total_executions = self.stats.total_executions,
+            total_execution_time = self.stats.total_execution_time
+        }
     }
 
     for groupId, group in pairs(self.groups) do
@@ -874,9 +887,12 @@ function Scheduler:serialize(callback_map)
     end
 
     for _, task in ipairs(self.tasks) do
-        local callback_id = callback_map[task.callback]
-        if not callback_id then
-            callback_id = "unknown"
+        local callback_id = "unknown"
+        if type(callback_map) == "table" then
+            local mapped_id = callback_map[task.callback]
+            if mapped_id ~= nil then
+                callback_id = mapped_id
+            end
         end
 
         table.insert(state.tasks, {
@@ -922,7 +938,10 @@ function Scheduler:deserialize(state, callback_map)
     end
 
     for _, t_state in ipairs(state.tasks or {}) do
-        local callback = callback_map[t_state.callback_id]
+        local callback = nil
+        if type(callback_map) == "table" then
+            callback = callback_map[t_state.callback_id]
+        end
         if callback then
             local task = {
                 id = t_state.id,
