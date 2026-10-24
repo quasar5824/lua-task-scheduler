@@ -803,7 +803,9 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
     end
 
     for _, t in ipairs(tasksToReinsert) do
-        self:_insert_task(t)
+        if not t.removed and not t.cancelled then
+            self:_insert_task(t)
+        end
     end
 end
 
