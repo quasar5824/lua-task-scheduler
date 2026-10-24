@@ -46,6 +46,7 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         interval = interval,
         priority = priority or 0,
         cancelled = false,
+        removed = false,
         executed = false,
         execution_count = 0,
         args = args,
@@ -93,6 +94,7 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         interval = interval,
         priority = priority or 0,
         cancelled = false,
+        removed = false,
         executed = false,
         execution_count = 0,
         args = args,
@@ -181,6 +183,7 @@ end
 
 function Scheduler:remove_task(task)
     if not task then return false end
+    task.removed = true
     self:remove_task_from_group(task)
 
     for i = 1, #self.tasks do
@@ -602,6 +605,7 @@ function Scheduler:get_group_active_count(groupId)
 end
 
 function Scheduler:_insert_task(task)
+    task.removed = false
     table.insert(self.tasks, task)
     self:_sift_up(#self.tasks)
 end
@@ -780,14 +784,14 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                             self:remove_task_from_group(task)
                         end
 
-                        if not should_reschedule and task.on_complete then
+                        if not should_reschedule and not task.removed and task.on_complete then
                             local comp_success, comp_err = pcall(task.on_complete, self.currentTime, task, result)
                             if not comp_success then
                                 self.logger.error("Task Scheduler on_complete Error: " .. tostring(comp_err))
                             end
                         end
 
-                        if should_reschedule then
+                        if should_reschedule and not task.removed then
                             table.insert(tasksToReinsert, task)
                         end
                     else
@@ -950,6 +954,7 @@ function Scheduler:deserialize(state, callback_map)
                 interval = t_state.interval,
                 priority = t_state.priority,
                 cancelled = t_state.cancelled,
+                removed = false,
                 executed = t_state.executed,
                 execution_count = t_state.execution_count,
                 args = t_state.args,
