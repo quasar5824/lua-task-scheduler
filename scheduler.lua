@@ -436,7 +436,7 @@ function Scheduler:peek_next_task()
             if not group_paused then
                 local deps_met = true
                 for _, dep in ipairs(task.dependencies) do
-                    if dep ~= task and not dep.executed then
+                    if dep and dep ~= task and not dep.executed and not dep.cancelled and not dep.removed then
                         deps_met = false
                         break
                     end
@@ -722,7 +722,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                 else
                     local deps_met = true
                     for _, dep in ipairs(task.dependencies) do
-                        if dep ~= task and not dep.executed then
+                        if dep and dep ~= task and not dep.executed and not dep.cancelled and not dep.removed then
                             deps_met = false
                             break
                         end
@@ -836,7 +836,7 @@ function Scheduler:weighted_select_due()
             if not group_paused then
                 local deps_met = true
                 for _, dep in ipairs(task.dependencies) do
-                    if dep ~= task and not dep.executed then
+                    if dep and dep ~= task and not dep.executed and not dep.cancelled and not dep.removed then
                         deps_met = false
                         break
                     end
