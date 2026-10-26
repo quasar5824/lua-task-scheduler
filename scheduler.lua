@@ -333,6 +333,26 @@ function Scheduler:pending_tasks()
     return count
 end
 
+function Scheduler:cancelled_tasks()
+    local count = 0
+    for _, task in ipairs(self.tasks) do
+        if task.cancelled then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+function Scheduler:executed_tasks()
+    local count = 0
+    for _, task in ipairs(self.tasks) do
+        if task.executed then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 function Scheduler:total_tasks()
     return #self.tasks
 end
