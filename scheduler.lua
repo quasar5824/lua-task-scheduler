@@ -183,11 +183,12 @@ end
 
 function Scheduler:remove_task(task)
     if not task then return false end
-    task.removed = true
-    self:remove_task_from_group(task)
 
     for i = 1, #self.tasks do
         if self.tasks[i] == task then
+            task.removed = true
+            self:remove_task_from_group(task)
+
             local last = table.remove(self.tasks)
             if i <= #self.tasks then
                 self.tasks[i] = last
