@@ -488,6 +488,8 @@ end
 
 function Scheduler:get_task_status(task)
     if not task then return nil end
+    if task.removed then return "removed"
+    end
     if task.cancelled then return "cancelled"
     end
     if task.executed then return "executed"
