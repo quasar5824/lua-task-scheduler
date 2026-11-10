@@ -15,6 +15,7 @@ function Scheduler.new()
         paused = false,
         nextTaskId = 1,
         logger = default_logger,
+        runningTask = nil,
         stats = {
             total_executions = 0,
             total_execution_time = 0
@@ -184,6 +185,12 @@ end
 function Scheduler:remove_task(task)
     if not task then return false end
 
+    if self.runningTask == task then
+        task.removed = true
+        self:remove_task_from_group(task)
+        return true
+    end
+
     for i = 1, #self.tasks do
         if self.tasks[i] == task then
             task.removed = true
@@ -327,7 +334,7 @@ end
 function Scheduler:pending_tasks()
     local count = 0
     for _, task in ipairs(self.tasks) do
-        if not task.cancelled then
+        if not task.cancelled and not task.removed then
             count = count + 1
         end
     end
@@ -337,7 +344,7 @@ end
 function Scheduler:cancelled_tasks()
     local count = 0
     for _, task in ipairs(self.tasks) do
-        if task.cancelled then
+        if task.cancelled and not task.removed then
             count = count + 1
         end
     end
@@ -347,7 +354,7 @@ end
 function Scheduler:executed_tasks()
     local count = 0
     for _, task in ipairs(self.tasks) do
-        if task.executed then
+        if task.executed and not task.removed then
             count = count + 1
         end
     end
@@ -369,7 +376,7 @@ end
 function Scheduler:get_active_tasks()
     local active = {}
     for _, task in ipairs(self.tasks) do
-        if not task.cancelled then
+        if not task.cancelled and not task.removed then
             table.insert(active, task)
         end
     end
@@ -381,7 +388,7 @@ function Scheduler:get_tasks_by_tag(tag)
     end
     local filtered = {}
     for _, task in ipairs(self.tasks) do
-        if task.tag == tag then
+        if task.tag == tag and not task.removed then
             table.insert(filtered, task)
         end
     end
@@ -393,7 +400,7 @@ function Scheduler:get_tasks_by_callback(callback)
     end
     local filtered = {}
     for _, task in ipairs(self.tasks) do
-        if task.callback == callback then
+        if task.callback == callback and not task.removed then
             table.insert(filtered, task)
         end
     end
@@ -445,7 +452,7 @@ end
 function Scheduler:peek_next_task()
     local best = nil
     for _, task in ipairs(self.tasks) do
-        if not task.cancelled then
+        if not task.cancelled and not task.removed then
             local group_paused = false
             if task.groupId then
                 local group = self.groups[task.groupId]
@@ -499,7 +506,7 @@ end
 
 function Scheduler:is_task_pending(task)
     if not task then return false end
-    return not task.cancelled and not task.executed
+    return not task.removed and not task.cancelled and not task.executed
 end
 
 function Scheduler:prune_cancelled()
@@ -752,8 +759,11 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                     end
 
                     if deps_met then
+                        local previousRunning = self.runningTask
+                        self.runningTask = task
                         local task_start = os.clock()
                         local success, result = pcall(task.callback, self.currentTime, task, task.args)
+                        self.runningTask = previousRunning
                         local task_end = os.clock()
                         local duration = task_end - task_start
 
@@ -803,6 +813,10 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                             should_reschedule = false
                         end
 
+                        if task.removed then
+                            should_reschedule = false
+                        end
+
                         if not should_reschedule then
                             self:remove_task_from_group(task)
                         end
@@ -847,7 +861,7 @@ function Scheduler:weighted_select_due()
     local total_weight = 0
 
     for _, task in ipairs(self.tasks) do
-        if not task.cancelled and task.next_run <= self.currentTime then
+        if not task.cancelled and not task.removed and task.next_run <= self.currentTime then
             local group_paused = false
             if task.groupId then
                 local group = self.groups[task.groupId]
