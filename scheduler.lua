@@ -59,7 +59,8 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         last_result = nil,
         weight = (weight == nil) and 1 or weight,
         last_execution_time = 0,
-        avg_execution_time = 0
+        avg_execution_time = 0,
+        _manually_scheduled = false
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -107,7 +108,8 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         last_result = nil,
         weight = (weight == nil) and 1 or weight,
         last_execution_time = 0,
-        avg_execution_time = 0
+        avg_execution_time = 0,
+        _manually_scheduled = false
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -252,6 +254,7 @@ function Scheduler:reschedule_task(task, new_delay)
         if groupId then
             self:add_task_to_group(task, groupId)
         end
+        task._manually_scheduled = true
         return true
     end
     return false
@@ -267,7 +270,10 @@ function Scheduler:update_task(task, updates)
             break
         end
     end
-    if not exists then return false end
+    if not exists and self.runningTask == task then
+        exists = true
+    end
+    if not exists or task.removed then return false end
 
     local needs_reinsert = false
 
@@ -308,6 +314,7 @@ function Scheduler:update_task(task, updates)
             if groupId then
                 self:add_task_to_group(task, groupId)
             end
+            task._manually_scheduled = true
             return true
         end
         return false
@@ -761,6 +768,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                     if deps_met then
                         local previousRunning = self.runningTask
                         self.runningTask = task
+                        task._manually_scheduled = false
                         local task_start = os.clock()
                         local success, result = pcall(task.callback, self.currentTime, task, task.args)
                         self.runningTask = previousRunning
@@ -781,6 +789,9 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                         task.execution_count = task.execution_count + 1
                         task.last_result = result
                         tasksExecuted = tasksExecuted + 1
+
+                        local manually_scheduled = (task._manually_scheduled == true)
+                        task._manually_scheduled = false
 
                         local should_reschedule = true
                         if type(result) == "table" then
@@ -817,18 +828,25 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                             should_reschedule = false
                         end
 
-                        if not should_reschedule then
+                        if manually_scheduled then
+                            should_reschedule = false
+                            if task.cancelled then
+                                self:remove_task(task)
+                            end
+                        end
+
+                        if not should_reschedule and not manually_scheduled then
                             self:remove_task_from_group(task)
                         end
 
-                        if not should_reschedule and not task.removed and task.on_complete then
+                        if not should_reschedule and not task.removed and task.on_complete and not manually_scheduled then
                             local comp_success, comp_err = pcall(task.on_complete, self.currentTime, task, result)
                             if not comp_success then
                                 self.logger.error("Task Scheduler on_complete Error: " .. tostring(comp_err))
                             end
                         end
 
-                        if should_reschedule and not task.removed then
+                        if should_reschedule and not task.removed and not manually_scheduled then
                             table.insert(tasksToReinsert, task)
                         end
                     else
@@ -1005,7 +1023,8 @@ function Scheduler:deserialize(state, callback_map)
                 last_result = t_state.last_result,
                 weight = (t_state.weight == nil) and 1 or t_state.weight,
                 last_execution_time = t_state.last_execution_time or 0,
-                avg_execution_time = t_state.avg_execution_time or 0
+                avg_execution_time = t_state.avg_execution_time or 0,
+                _manually_scheduled = false
             }
 
             if task.groupId then
