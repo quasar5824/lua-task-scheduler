@@ -19,7 +19,8 @@ function Scheduler.new()
         stats = {
             total_executions = 0,
             total_execution_time = 0
-        }
+        },
+        _deferred_tasks = nil
     }, Scheduler)
 end
 
@@ -60,7 +61,8 @@ function Scheduler:add_task(callback, delay, interval, priority, args, tag, time
         weight = (weight == nil) and 1 or weight,
         last_execution_time = 0,
         avg_execution_time = 0,
-        _manually_scheduled = false
+        _manually_scheduled = false,
+        _deferred = false
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -109,7 +111,8 @@ function Scheduler:wait_until(absoluteTime, callback, interval, priority, args, 
         weight = (weight == nil) and 1 or weight,
         last_execution_time = 0,
         avg_execution_time = 0,
-        _manually_scheduled = false
+        _manually_scheduled = false,
+        _deferred = false
     }
     self.nextTaskId = self.nextTaskId + 1
     self:_insert_task(task)
@@ -186,32 +189,65 @@ end
 
 function Scheduler:remove_task(task)
     if not task then return false end
+    if task.removed then return false end
 
-    if self.runningTask == task then
-        task.removed = true
-        self:remove_task_from_group(task)
+    local is_running = (self.runningTask == task)
+    local is_deferred = (task._deferred == true)
+
+    local heap_index = nil
+    for i = 1, #self.tasks do
+        if self.tasks[i] == task then
+            heap_index = i
+            break
+        end
+    end
+
+    local in_group = false
+    for _, group in pairs(self.groups) do
+        for _, t in ipairs(group.tasks) do
+            if t == task then
+                in_group = true
+                break
+            end
+        end
+        if in_group then break end
+    end
+
+    if not is_running and heap_index == nil and not is_deferred and not in_group then
+        return false
+    end
+
+    task.removed = true
+    task._deferred = false
+
+    if is_deferred and self._deferred_tasks then
+        for i = #self._deferred_tasks, 1, -1 do
+            if self._deferred_tasks[i] == task then
+                table.remove(self._deferred_tasks, i)
+            end
+        end
+    end
+
+    self:remove_task_from_group(task)
+
+    if is_running then
         return true
     end
 
-    for i = 1, #self.tasks do
-        if self.tasks[i] == task then
-            task.removed = true
-            self:remove_task_from_group(task)
-
-            local last = table.remove(self.tasks)
-            if i <= #self.tasks then
-                self.tasks[i] = last
-                local parentIdx = math.floor(i / 2)
-                if i > 1 and self:_compare_tasks(last, self.tasks[parentIdx]) then
-                    self:_sift_up(i)
-                else
-                    self:_sift_down(i)
-                end
+    if heap_index then
+        local last = table.remove(self.tasks)
+        if heap_index <= #self.tasks then
+            self.tasks[heap_index] = last
+            local parentIdx = math.floor(heap_index / 2)
+            if heap_index > 1 and self:_compare_tasks(last, self.tasks[parentIdx]) then
+                self:_sift_up(heap_index)
+            else
+                self:_sift_down(heap_index)
             end
-            return true
         end
     end
-    return false
+
+    return true
 end
 
 function Scheduler:remove_tasks_by_tag(tag)
@@ -263,16 +299,31 @@ end
 function Scheduler:update_task(task, updates)
     if not task or not updates then return false end
 
-    local exists = false
+    local is_running = (self.runningTask == task)
+
+    local in_heap = false
     for _, t in ipairs(self.tasks) do
         if t == task then
-            exists = true
+            in_heap = true
             break
         end
     end
-    if not exists and self.runningTask == task then
-        exists = true
+
+    local is_deferred = (task._deferred == true)
+
+    local exists = in_heap or is_running or is_deferred
+    if not exists then
+        for _, group in pairs(self.groups) do
+            for _, t in ipairs(group.tasks) do
+                if t == task then
+                    exists = true
+                    break
+                end
+            end
+            if exists then break end
+        end
     end
+
     if not exists or task.removed then return false end
 
     local needs_reinsert = false
@@ -309,15 +360,51 @@ function Scheduler:update_task(task, updates)
 
     if needs_reinsert then
         local groupId = task.groupId
-        if self:remove_task(task) then
-            self:_insert_task(task)
-            if groupId then
-                self:add_task_to_group(task, groupId)
+        if is_running then
+            if updates.delay ~= nil then
+                if self:remove_task(task) then
+                    self:_insert_task(task)
+                    if groupId then
+                        self:add_task_to_group(task, groupId)
+                    end
+                    task._manually_scheduled = true
+                    return true
+                end
+                return false
             end
-            task._manually_scheduled = true
             return true
+        elseif is_deferred then
+            if updates.delay ~= nil then
+                if self._deferred_tasks then
+                    for i = #self._deferred_tasks, 1, -1 do
+                        if self._deferred_tasks[i] == task then
+                            table.remove(self._deferred_tasks, i)
+                        end
+                    end
+                end
+                task._deferred = false
+                if self:remove_task(task) then
+                    self:_insert_task(task)
+                    if groupId then
+                        self:add_task_to_group(task, groupId)
+                    end
+                    task._manually_scheduled = true
+                    return true
+                end
+                return false
+            end
+            return true
+        else
+            if self:remove_task(task) then
+                self:_insert_task(task)
+                if groupId then
+                    self:add_task_to_group(task, groupId)
+                end
+                task._manually_scheduled = true
+                return true
+            end
+            return false
         end
-        return false
     end
 
     return true
@@ -327,6 +414,7 @@ function Scheduler:clear()
     self.tasks = {}
     self.groups = {}
     self.nextTaskId = 1
+    self._deferred_tasks = nil
     self.stats = {
         total_executions = 0,
         total_execution_time = 0
@@ -336,6 +424,7 @@ end
 function Scheduler:remove_all_tasks()
     self.tasks = {}
     self.groups = {}
+    self._deferred_tasks = nil
 end
 
 function Scheduler:pending_tasks()
@@ -717,6 +806,8 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
     local tasksExecuted = 0
 
     local tasksToReinsert = {}
+    local prev_deferred = self._deferred_tasks
+    self._deferred_tasks = tasksToReinsert
 
     while #self.tasks > 0 and self.tasks[1].next_run <= self.currentTime do
         if maxExecutionTime ~= nil and (os.clock() - startTime) > maxExecutionTime then
@@ -751,6 +842,7 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
             end
 
             if group_paused then
+                task._deferred = true
                 table.insert(tasksToReinsert, task)
             else
                 if task.timeout ~= nil and (self.currentTime - task.next_run > task.timeout) then
@@ -847,9 +939,11 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
                         end
 
                         if should_reschedule and not task.removed and not manually_scheduled then
+                            task._deferred = true
                             table.insert(tasksToReinsert, task)
                         end
                     else
+                        task._deferred = true
                         table.insert(tasksToReinsert, task)
                     end
                 end
@@ -857,9 +951,14 @@ function Scheduler:execute_due(maxExecutionTime, maxTasks)
         end
     end
 
+    self._deferred_tasks = prev_deferred
+
     for _, t in ipairs(tasksToReinsert) do
         if not t.removed and not t.cancelled then
+            t._deferred = false
             self:_insert_task(t)
+        else
+            t._deferred = false
         end
     end
 end
@@ -988,6 +1087,7 @@ function Scheduler:deserialize(state, callback_map)
     self.nextTaskId = state.nextTaskId or 1
     self.tasks = {}
     self.groups = {}
+    self._deferred_tasks = nil
     self.stats = state.stats or {
         total_executions = 0,
         total_execution_time = 0
@@ -1024,7 +1124,8 @@ function Scheduler:deserialize(state, callback_map)
                 weight = (t_state.weight == nil) and 1 or t_state.weight,
                 last_execution_time = t_state.last_execution_time or 0,
                 avg_execution_time = t_state.avg_execution_time or 0,
-                _manually_scheduled = false
+                _manually_scheduled = false,
+                _deferred = false
             }
 
             if task.groupId then
