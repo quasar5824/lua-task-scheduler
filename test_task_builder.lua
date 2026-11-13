@@ -103,6 +103,55 @@ do
         :build()
     alias_scheduler:update(0)
     assert_eq(#alias_results, 1, "builder aliases")
+
+    local absolute_scheduler = Scheduler.new()
+    absolute_scheduler:set_time(10)
+    local absolute_results = {}
+    TaskBuilder.new(absolute_scheduler)
+        :run(function() absolute_results[#absolute_results + 1] = "absolute" end)
+        :schedule_at(12)
+    absolute_scheduler:update(1)
+    assert_eq(#absolute_results, 0, "builder schedule_at no early run")
+    absolute_scheduler:update(1)
+    assert_eq(#absolute_results, 1, "builder schedule_at run")
+
+    local at_time_scheduler = Scheduler.new()
+    at_time_scheduler:set_time(5)
+    local at_time_results = {}
+    TaskBuilder.new(at_time_scheduler)
+        :run(function() at_time_results[#at_time_results + 1] = "at time" end)
+        :at_time(7)
+        :schedule()
+    at_time_scheduler:update(1)
+    assert_eq(#at_time_results, 0, "builder at_time no early run")
+    at_time_scheduler:update(1)
+    assert_eq(#at_time_results, 1, "builder at_time run")
+
+    local dependency_scheduler = Scheduler.new()
+    local dependency_results = {}
+    local dependency_one = dependency_scheduler:add_task(function() dependency_results[#dependency_results + 1] = "dep one" end, 0)
+    local dependency_two = dependency_scheduler:add_task(function() dependency_results[#dependency_results + 1] = "dep two" end, 0)
+    TaskBuilder.new(dependency_scheduler)
+        :run(function() dependency_results[#dependency_results + 1] = "dependent" end)
+        :depends_on(dependency_one, dependency_two)
+        :schedule()
+    dependency_scheduler:update(0)
+    assert_eq(dependency_results[1], "dep one", "builder varargs dependency order 1")
+    assert_eq(dependency_results[2], "dep two", "builder varargs dependency order 2")
+    assert_eq(dependency_results[3], "dependent", "builder varargs dependency order 3")
+
+    local group_scheduler = Scheduler.new()
+    local group_results = {}
+    TaskBuilder.new(group_scheduler)
+        :run(function() group_results[#group_results + 1] = "grouped task" end)
+        :group("left", "right")
+        :schedule()
+    group_scheduler:pause_group("left")
+    group_scheduler:update(0)
+    assert_eq(#group_results, 0, "builder varargs group paused")
+    group_scheduler:resume_group("left")
+    group_scheduler:update(0)
+    assert_eq(#group_results, 1, "builder varargs group resumed")
 end
 
 print("task builder tests passed")

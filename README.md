@@ -82,7 +82,16 @@ local task = TaskBuilder.new(sched)
 
 -- Schedule a task to run immediately
 TaskBuilder.new(sched):run(function() print("now") end):now()
+
+-- Schedule a task at an absolute scheduler time
+TaskBuilder.new(sched):run(function() print("later") end):schedule_at(25)
 ```
+
+Additional builder conveniences:
+
+- `:at_time(time)` / `:schedule_at(time)`: Schedule using an absolute scheduler time.
+- `:depends_on(task, ...)` and `:group(name, ...)`: Accept multiple values as well as lists.
+- Common aliases such as `:delay()`, `:with_delay()`, `:run_at()`, `:start_at()`, `:with_interval()`, `:with_dependencies()`, `:with_groups()`, and `:immediately()`.
 
 ## Testing
 
