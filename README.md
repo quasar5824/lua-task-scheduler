@@ -52,3 +52,17 @@ end
 - `is_paused()`: Returns whether the scheduler is currently paused.
 - `get_time()`: Returns the current scheduler time.
 - `set_time(time)`: Sets the current scheduler time.
+
+## Testing
+
+Run the smoke tests:
+
+```sh
+lua smoke_test.lua
+```
+
+Run the full test suite:
+
+```sh
+lua test_scheduler.lua
+```
