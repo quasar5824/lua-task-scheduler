@@ -29,7 +29,7 @@ end
 ## API
 
 - `new()`: Creates a new scheduler instance.
-- `add_task(callback, delay, interval, priority, args, tag)`: Schedules a task.
+- `add_task(callback, delay, interval, priority, args, tag, timeout, on_complete, weight)`: Schedules a task.
 - `cancel_task(task)`: Marks a task as cancelled.
 - `cancel_tasks_by_tag(tag)`: Marks all tasks with the given tag as cancelled.
 - `remove_task(task)`: Immediately removes a task from the queue.
@@ -53,6 +53,37 @@ end
 - `get_time()`: Returns the current scheduler time.
 - `set_time(time)`: Sets the current scheduler time.
 
+## Fluent Task Builder
+
+The optional `task_builder` module provides a fluent interface for scheduling tasks.
+
+```lua
+local Scheduler = require("scheduler")
+local TaskBuilder = require("task_builder")
+
+local sched = Scheduler.new()
+local task = TaskBuilder.new(sched)
+    :run(function(currentTime, task, args)
+        print("Hello " .. args.name)
+    end)
+    :after(2)
+    :every(1)
+    :priority(5)
+    :with_args({name = "World"})
+    :tag("worker")
+    :timeout(10)
+    :on_complete(function(currentTime, task, result)
+        print("Completed: " .. tostring(result))
+    end)
+    :weight(3)
+    :depends_on(other_task)
+    :group("workers")
+    :schedule()
+
+-- Schedule a task to run immediately
+TaskBuilder.new(sched):run(function() print("now") end):now()
+```
+
 ## Testing
 
 Run the smoke tests:
@@ -65,4 +96,10 @@ Run the full test suite:
 
 ```sh
 lua test_scheduler.lua
+```
+
+Run the task builder tests:
+
+```sh
+lua test_task_builder.lua
 ```
