@@ -14,6 +14,26 @@ local function append_unique(list, value)
     list[#list + 1] = value
 end
 
+local function collect_values(values)
+    local result = {}
+
+    local function visit(value)
+        if type(value) == "table" and not is_task(value) then
+            for i = 1, #value do
+                visit(value[i])
+            end
+        elseif value ~= nil then
+            result[#result + 1] = value
+        end
+    end
+
+    for i = 1, #values do
+        visit(values[i])
+    end
+
+    return result
+end
+
 function TaskBuilder.new(scheduler)
     if type(scheduler) ~= "table" or type(scheduler.add_task) ~= "function" then
         error("TaskBuilder.new requires a scheduler instance")
@@ -87,10 +107,7 @@ function TaskBuilder:weight(weight)
 end
 
 function TaskBuilder:depends_on(dependency, ...)
-    local dependencies = {dependency, ...}
-    if #dependencies == 1 and type(dependency) == "table" and not is_task(dependency) then
-        dependencies = dependency
-    end
+    local dependencies = collect_values({dependency, ...})
 
     for i = 1, #dependencies do
         if not is_task(dependencies[i]) then
@@ -102,10 +119,7 @@ function TaskBuilder:depends_on(dependency, ...)
 end
 
 function TaskBuilder:group(name, ...)
-    local groups = {name, ...}
-    if #groups == 1 and type(groups[1]) == "table" then
-        groups = groups[1]
-    end
+    local groups = collect_values({name, ...})
 
     for i = 1, #groups do
         append_unique(self._groups, groups[i])
@@ -168,35 +182,56 @@ function TaskBuilder:now()
 end
 
 local aliases = {
+    callback = "run",
+    action = "run",
+    job = "run",
+    work = "run",
     delay = "after",
     with_delay = "after",
+    delay_for = "after",
+    wait_for = "after",
+    start_in = "after",
     at = "at_time",
     run_at = "at_time",
     start_at = "at_time",
     delay_until = "at_time",
     schedule_at_time = "schedule_at",
     run_at_time = "schedule_at",
+    schedule_for = "schedule_at",
+    at_timestamp = "at_time",
+    wait_until = "at_time",
     interval = "every",
+    recurring = "every",
     repeat_every = "every",
     with_interval = "every",
     with_priority = "priority",
+    prio = "priority",
     args = "with_args",
+    arguments = "with_args",
+    params = "with_args",
     with_tag = "tag",
     tagged = "tag",
+    named = "tag",
     with_timeout = "timeout",
     expires_after = "timeout",
+    ttl = "timeout",
     onComplete = "on_complete",
     with_weight = "weight",
+    cost = "weight",
     depends = "depends_on",
     dependsOn = "depends_on",
     requires = "depends_on",
+    needs = "depends_on",
     with_dependencies = "depends_on",
     in_group = "group",
     inGroup = "group",
     with_group = "group",
     withGroup = "group",
     with_groups = "group",
+    grouped = "group",
     immediately = "now",
+    asap = "now",
+    right_now = "now",
     build = "schedule",
     submit = "schedule",
     enqueue = "schedule",
