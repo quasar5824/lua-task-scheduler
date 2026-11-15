@@ -152,6 +152,19 @@ do
     group_scheduler:resume_group("left")
     group_scheduler:update(0)
     assert_eq(#group_results, 1, "builder varargs group resumed")
+
+    local nested_scheduler = Scheduler.new()
+    local nested_results = {}
+    local nested_dep = nested_scheduler:add_task(function() nested_results[#nested_results + 1] = "nested dep" end, 0)
+    TaskBuilder.new(nested_scheduler)
+        :run(function() nested_results[#nested_results + 1] = "nested task" end)
+        :depends_on({{nested_dep}})
+        :group({{"nested-group"}})
+        :schedule()
+    nested_scheduler:pause_group("nested-group")
+    nested_scheduler:update(0)
+    assert_eq(#nested_results, 1, "builder nested dependency runs before pause check")
+    assert_eq(nested_results[1], "nested dep", "builder nested dependency order")
 end
 
 print("task builder tests passed")

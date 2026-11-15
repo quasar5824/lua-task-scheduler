@@ -14,21 +14,44 @@ local function append_unique(list, value)
     list[#list + 1] = value
 end
 
+local function collect_indices(value)
+    local indices = {}
+    for key in pairs(value) do
+        if type(key) == "number" and key > 0 and key == math.floor(key) then
+            indices[#indices + 1] = key
+        end
+    end
+    table.sort(indices)
+    return indices
+end
+
 local function collect_values(values)
     local result = {}
 
     local function visit(value)
-        if type(value) == "table" and not is_task(value) then
-            for i = 1, #value do
-                visit(value[i])
-            end
-        elseif value ~= nil then
+        if value == nil then
+            return
+        end
+
+        if type(value) ~= "table" or is_task(value) then
             result[#result + 1] = value
+            return
+        end
+
+        local indices = collect_indices(value)
+        if #indices == 0 then
+            result[#result + 1] = value
+            return
+        end
+
+        for i = 1, #indices do
+            visit(value[indices[i]])
         end
     end
 
-    for i = 1, #values do
-        visit(values[i])
+    local top_indices = collect_indices(values)
+    for i = 1, #top_indices do
+        visit(values[top_indices[i]])
     end
 
     return result
@@ -68,6 +91,9 @@ end
 
 function TaskBuilder:at_time(time)
     self._run_at = time
+    if time ~= nil then
+        self._delay = 0
+    end
     return self
 end
 
@@ -172,6 +198,9 @@ end
 
 function TaskBuilder:schedule_at(time)
     self._run_at = time
+    if time ~= nil then
+        self._delay = 0
+    end
     return self:schedule()
 end
 
