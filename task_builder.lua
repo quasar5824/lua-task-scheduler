@@ -40,6 +40,10 @@ local function collect_values(values)
 
         local indices = collect_indices(value)
         if #indices == 0 then
+            -- Empty tables represent empty collections, not values to schedule.
+            if next(value) == nil then
+                return
+            end
             result[#result + 1] = value
             return
         end
@@ -57,13 +61,13 @@ local function collect_values(values)
     return result
 end
 
-function TaskBuilder.new(scheduler)
+function TaskBuilder.new(scheduler, callback)
     if type(scheduler) ~= "table" or type(scheduler.add_task) ~= "function" then
         error("TaskBuilder.new requires a scheduler instance")
     end
     return setmetatable({
         _scheduler = scheduler,
-        _callback = nil,
+        _callback = callback,
         _delay = 0,
         _run_at = nil,
         _interval = nil,
@@ -252,11 +256,13 @@ local aliases = {
     requires = "depends_on",
     needs = "depends_on",
     with_dependencies = "depends_on",
+    dependencies = "depends_on",
     in_group = "group",
     inGroup = "group",
     with_group = "group",
     withGroup = "group",
     with_groups = "group",
+    groups = "group",
     grouped = "group",
     immediately = "now",
     asap = "now",

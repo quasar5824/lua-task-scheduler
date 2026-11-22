@@ -167,4 +167,22 @@ do
     assert_eq(nested_results[1], "nested dep", "builder nested dependency order")
 end
 
+local optional_scheduler = Scheduler.new()
+local optional_results = {}
+TaskBuilder.new(optional_scheduler, function() optional_results[#optional_results + 1] = "optional" end)
+    :after(0)
+    :schedule()
+optional_scheduler:update(0)
+assert_eq(#optional_results, 1, "builder constructor callback")
+
+local empty_scheduler = Scheduler.new()
+local empty_results = {}
+TaskBuilder.new(empty_scheduler)
+    :run(function() empty_results[#empty_results + 1] = "empty" end)
+    :depends_on({})
+    :group({})
+    :schedule()
+empty_scheduler:update(0)
+assert_eq(#empty_results, 1, "builder empty collections")
+
 print("task builder tests passed")
