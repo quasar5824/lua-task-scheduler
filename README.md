@@ -92,6 +92,8 @@ Additional builder conveniences:
 - `:at_time(time)` / `:schedule_at(time)`: Schedule using an absolute scheduler time.
 - `:depends_on(task, ...)` and `:group(name, ...)`: Accept multiple values as well as lists.
 - Common aliases such as `:delay()`, `:with_delay()`, `:run_at()`, `:start_at()`, `:with_interval()`, `:with_dependencies()`, `:with_groups()`, and `:immediately()`.
+- Dependencies and groups may also be provided as nested arrays or maps when constructing a builder.
+- `TaskBuilder.new` accepts an options table in place of, or in addition to, the callback for constructor flexibility.
 
 ## Testing
 

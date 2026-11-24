@@ -25,8 +25,27 @@ local function collect_indices(value)
     return indices
 end
 
+local function sorted_keys(value)
+    local keys = {}
+    for key in pairs(value) do
+        keys[#keys + 1] = key
+    end
+    table.sort(keys, function(a, b)
+        local ta, tb = type(a), type(b)
+        if ta ~= tb then
+            return ta < tb
+        end
+        if ta == "number" then
+            return a < b
+        end
+        return tostring(a) < tostring(b)
+    end)
+    return keys
+end
+
 local function collect_values(values)
     local result = {}
+    local visited = {}
 
     local function visit(value)
         if value == nil then
@@ -38,36 +57,107 @@ local function collect_values(values)
             return
         end
 
-        local indices = collect_indices(value)
-        if #indices == 0 then
-            -- Empty tables represent empty collections, not values to schedule.
-            if next(value) == nil then
-                return
-            end
-            result[#result + 1] = value
+        if visited[value] then
             return
         end
+        visited[value] = true
 
-        for i = 1, #indices do
-            visit(value[indices[i]])
+        local indices = collect_indices(value)
+        if #indices > 0 then
+            for i = 1, #indices do
+                visit(value[indices[i]])
+            end
+        else
+            -- Empty tables represent empty collections, not values to schedule.
+            if next(value) == nil then
+                visited[value] = nil
+                return
+            end
+
+            -- Support map-style collections in addition to arrays.
+            for _, key in ipairs(sorted_keys(value)) do
+                visit(value[key])
+            end
         end
+
+        visited[value] = nil
     end
 
     local top_indices = collect_indices(values)
-    for i = 1, #top_indices do
-        visit(values[top_indices[i]])
+    if #top_indices > 0 then
+        for i = 1, #top_indices do
+            visit(values[top_indices[i]])
+        end
+    else
+        -- Allow a bare collection to be passed without an outer wrapper.
+        if next(values) ~= nil and not visited[values] then
+            visit(values)
+        end
     end
 
     return result
 end
 
-function TaskBuilder.new(scheduler, callback)
+local function apply_options(builder, options)
+    if type(options) ~= "table" then
+        return builder
+    end
+
+    if type(options.callback) == "function" or type(options.run) == "function" then
+        builder:run(options.callback or options.run or options.action or options.job or options.work)
+    end
+    if options.delay ~= nil or options.after ~= nil then
+        builder:after(options.delay or options.after)
+    end
+    if options.run_at ~= nil or options.at_time ~= nil or options.time ~= nil or options.schedule_at ~= nil then
+        builder:at_time(options.run_at or options.at_time or options.time or options.schedule_at)
+    end
+    if options.interval ~= nil or options.every ~= nil then
+        builder:every(options.interval or options.every)
+    end
+    if options.priority ~= nil or options.prio ~= nil then
+        builder:priority(options.priority or options.prio)
+    end
+    if options.args ~= nil or options.arguments ~= nil or options.params ~= nil then
+        builder:with_args(options.args or options.arguments or options.params)
+    end
+    if options.tag ~= nil then
+        builder:tag(options.tag)
+    end
+    if options.timeout ~= nil or options.ttl ~= nil then
+        builder:timeout(options.timeout or options.ttl)
+    end
+    if type(options.on_complete) == "function" or type(options.onComplete) == "function" then
+        builder:on_complete(options.on_complete or options.onComplete)
+    end
+    if options.weight ~= nil or options.cost ~= nil then
+        builder:weight(options.weight or options.cost)
+    end
+    if options.dependencies ~= nil or options.depends_on ~= nil or options.depends ~= nil then
+        builder:depends_on(options.dependencies or options.depends_on or options.depends)
+    end
+    if options.groups ~= nil or options.group ~= nil then
+        builder:group(options.groups or options.group)
+    end
+
+    return builder
+end
+
+function TaskBuilder.new(scheduler, callback, options)
+    if type(scheduler) == "table" and type(scheduler.add_task) ~= "function" then
+        local opts = scheduler
+        scheduler = opts.scheduler
+        callback = opts.callback or opts.run or opts.action or opts.job or opts.work or callback
+        options = opts
+    end
+
     if type(scheduler) ~= "table" or type(scheduler.add_task) ~= "function" then
         error("TaskBuilder.new requires a scheduler instance")
     end
-    return setmetatable({
+
+    local builder = setmetatable({
         _scheduler = scheduler,
-        _callback = callback,
+        _callback = (type(callback) == "function") and callback or nil,
         _delay = 0,
         _run_at = nil,
         _interval = nil,
@@ -80,6 +170,15 @@ function TaskBuilder.new(scheduler, callback)
         _dependencies = {},
         _groups = {},
     }, TaskBuilder)
+
+    if type(callback) == "table" then
+        apply_options(builder, callback)
+    end
+    if type(options) == "table" then
+        apply_options(builder, options)
+    end
+
+    return builder
 end
 
 function TaskBuilder:run(callback)
