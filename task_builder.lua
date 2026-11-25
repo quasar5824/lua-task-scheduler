@@ -74,9 +74,24 @@ local function collect_values(values)
                 return
             end
 
-            -- Support map-style collections in addition to arrays.
-            for _, key in ipairs(sorted_keys(value)) do
-                visit(value[key])
+            -- Boolean-valued tables are treated as sets, using their keys as items.
+            local set_style = true
+            for _, item in pairs(value) do
+                if item ~= true and item ~= false and item ~= nil then
+                    set_style = false
+                    break
+                end
+            end
+
+            if set_style then
+                for _, key in ipairs(sorted_keys(value)) do
+                    visit(key)
+                end
+            else
+                -- Support map-style collections in addition to arrays.
+                for _, key in ipairs(sorted_keys(value)) do
+                    visit(value[key])
+                end
             end
         end
 
@@ -103,52 +118,53 @@ local function apply_options(builder, options)
         return builder
     end
 
-    if type(options.callback) == "function" or type(options.run) == "function" then
-        builder:run(options.callback or options.run or options.action or options.job or options.work)
+    if options.callback ~= nil or options.run ~= nil or options.action ~= nil or options.job ~= nil or options.work ~= nil or options.fn ~= nil or options.func ~= nil or options.handler ~= nil then
+        builder:run(options.callback or options.run or options.action or options.job or options.work or options.fn or options.func or options.handler)
     end
-    if options.delay ~= nil or options.after ~= nil then
-        builder:after(options.delay or options.after)
+    if options.delay ~= nil or options.after ~= nil or options.delay_for ~= nil or options.wait_for ~= nil or options.start_in ~= nil or options.with_delay ~= nil then
+        builder:after(options.delay or options.after or options.delay_for or options.wait_for or options.start_in or options.with_delay)
     end
-    if options.run_at ~= nil or options.at_time ~= nil or options.time ~= nil or options.schedule_at ~= nil then
-        builder:at_time(options.run_at or options.at_time or options.time or options.schedule_at)
+    if options.run_at ~= nil or options.at_time ~= nil or options.time ~= nil or options.schedule_at ~= nil or options.at ~= nil or options.start_at ~= nil or options.delay_until ~= nil or options.schedule_at_time ~= nil or options.run_at_time ~= nil or options.schedule_for ~= nil or options.at_timestamp ~= nil or options.wait_until ~= nil then
+        builder:at_time(options.run_at or options.at_time or options.time or options.schedule_at or options.at or options.start_at or options.delay_until or options.schedule_at_time or options.run_at_time or options.schedule_for or options.at_timestamp or options.wait_until)
     end
-    if options.interval ~= nil or options.every ~= nil then
-        builder:every(options.interval or options.every)
+    if options.interval ~= nil or options.every ~= nil or options.recurring ~= nil or options.repeat_every ~= nil or options.with_interval ~= nil then
+        builder:every(options.interval or options.every or options.recurring or options.repeat_every or options.with_interval)
     end
-    if options.priority ~= nil or options.prio ~= nil then
-        builder:priority(options.priority or options.prio)
+    if options.priority ~= nil or options.prio ~= nil or options.with_priority ~= nil then
+        builder:priority(options.priority or options.prio or options.with_priority)
     end
-    if options.args ~= nil or options.arguments ~= nil or options.params ~= nil then
-        builder:with_args(options.args or options.arguments or options.params)
+    if options.args ~= nil or options.arguments ~= nil or options.params ~= nil or options.with_args ~= nil then
+        builder:with_args(options.args or options.arguments or options.params or options.with_args)
     end
-    if options.tag ~= nil then
-        builder:tag(options.tag)
+    if options.tag ~= nil or options.with_tag ~= nil or options.tagged ~= nil or options.named ~= nil then
+        builder:tag(options.tag or options.with_tag or options.tagged or options.named)
     end
-    if options.timeout ~= nil or options.ttl ~= nil then
-        builder:timeout(options.timeout or options.ttl)
+    if options.timeout ~= nil or options.ttl ~= nil or options.with_timeout ~= nil or options.expires_after ~= nil then
+        builder:timeout(options.timeout or options.ttl or options.with_timeout or options.expires_after)
     end
     if type(options.on_complete) == "function" or type(options.onComplete) == "function" then
         builder:on_complete(options.on_complete or options.onComplete)
     end
-    if options.weight ~= nil or options.cost ~= nil then
-        builder:weight(options.weight or options.cost)
+    if options.weight ~= nil or options.cost ~= nil or options.with_weight ~= nil then
+        builder:weight(options.weight or options.cost or options.with_weight)
     end
-    if options.dependencies ~= nil or options.depends_on ~= nil or options.depends ~= nil then
-        builder:depends_on(options.dependencies or options.depends_on or options.depends)
+    if options.dependencies ~= nil or options.depends_on ~= nil or options.depends ~= nil or options.dependsOn ~= nil or options.requires ~= nil or options.needs ~= nil or options.with_dependencies ~= nil then
+        builder:depends_on(options.dependencies or options.depends_on or options.depends or options.dependsOn or options.requires or options.needs or options.with_dependencies)
     end
-    if options.groups ~= nil or options.group ~= nil then
-        builder:group(options.groups or options.group)
+    if options.groups ~= nil or options.group ~= nil or options.with_group ~= nil or options.with_groups ~= nil or options.in_group ~= nil or options.inGroup ~= nil or options.grouped ~= nil then
+        builder:group(options.groups or options.group or options.with_group or options.with_groups or options.in_group or options.inGroup or options.grouped)
     end
 
     return builder
 end
 
 function TaskBuilder.new(scheduler, callback, options)
+    local constructor_opts = nil
+
     if type(scheduler) == "table" and type(scheduler.add_task) ~= "function" then
-        local opts = scheduler
-        scheduler = opts.scheduler
-        callback = opts.callback or opts.run or opts.action or opts.job or opts.work or callback
-        options = opts
+        constructor_opts = scheduler
+        scheduler = constructor_opts.scheduler or constructor_opts.sched or constructor_opts.queue
+        callback = constructor_opts.callback or constructor_opts.run or constructor_opts.action or constructor_opts.job or constructor_opts.work or constructor_opts.fn or constructor_opts.func or constructor_opts.handler or callback
     end
 
     if type(scheduler) ~= "table" or type(scheduler.add_task) ~= "function" then
@@ -173,6 +189,9 @@ function TaskBuilder.new(scheduler, callback, options)
 
     if type(callback) == "table" then
         apply_options(builder, callback)
+    end
+    if type(constructor_opts) == "table" then
+        apply_options(builder, constructor_opts)
     end
     if type(options) == "table" then
         apply_options(builder, options)
@@ -318,6 +337,9 @@ local aliases = {
     action = "run",
     job = "run",
     work = "run",
+    fn = "run",
+    func = "run",
+    handler = "run",
     delay = "after",
     with_delay = "after",
     delay_for = "after",
@@ -341,6 +363,7 @@ local aliases = {
     args = "with_args",
     arguments = "with_args",
     params = "with_args",
+    with_args = "with_args",
     with_tag = "tag",
     tagged = "tag",
     named = "tag",
