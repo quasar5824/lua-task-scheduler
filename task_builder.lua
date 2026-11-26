@@ -113,46 +113,92 @@ local function collect_values(values)
     return result
 end
 
+local function first_present(options, keys)
+    for i = 1, #keys do
+        local value = options[keys[i]]
+        if value ~= nil then
+            return value
+        end
+    end
+    return nil
+end
+
+local function has_any(options, keys)
+    for i = 1, #keys do
+        if options[keys[i]] ~= nil then
+            return true
+        end
+    end
+    return false
+end
+
 local function apply_options(builder, options)
     if type(options) ~= "table" then
         return builder
     end
 
-    if options.callback ~= nil or options.run ~= nil or options.action ~= nil or options.job ~= nil or options.work ~= nil or options.fn ~= nil or options.func ~= nil or options.handler ~= nil then
-        builder:run(options.callback or options.run or options.action or options.job or options.work or options.fn or options.func or options.handler)
+    local callback_keys = { "callback", "run", "action", "job", "work", "fn", "func", "handler", "task", "execute", "invoke" }
+    if has_any(options, callback_keys) then
+        builder:run(first_present(options, callback_keys))
     end
-    if options.delay ~= nil or options.after ~= nil or options.delay_for ~= nil or options.wait_for ~= nil or options.start_in ~= nil or options.with_delay ~= nil then
-        builder:after(options.delay or options.after or options.delay_for or options.wait_for or options.start_in or options.with_delay)
+
+    local delay_keys = { "delay", "after", "delay_for", "wait_for", "start_in", "with_delay", "delayFor", "waitFor", "startIn", "withDelay" }
+    if has_any(options, delay_keys) then
+        builder:after(first_present(options, delay_keys))
     end
-    if options.run_at ~= nil or options.at_time ~= nil or options.time ~= nil or options.schedule_at ~= nil or options.at ~= nil or options.start_at ~= nil or options.delay_until ~= nil or options.schedule_at_time ~= nil or options.run_at_time ~= nil or options.schedule_for ~= nil or options.at_timestamp ~= nil or options.wait_until ~= nil then
-        builder:at_time(options.run_at or options.at_time or options.time or options.schedule_at or options.at or options.start_at or options.delay_until or options.schedule_at_time or options.run_at_time or options.schedule_for or options.at_timestamp or options.wait_until)
+
+    local time_keys = { "run_at", "at_time", "time", "schedule_at", "at", "start_at", "delay_until", "schedule_at_time", "run_at_time", "schedule_for", "at_timestamp", "wait_until", "runAt", "atTime", "scheduleAt", "startAt", "delayUntil", "scheduleAtTime", "runAtTime", "scheduleFor", "atTimestamp", "waitUntil" }
+    if has_any(options, time_keys) then
+        builder:at_time(first_present(options, time_keys))
     end
-    if options.interval ~= nil or options.every ~= nil or options.recurring ~= nil or options.repeat_every ~= nil or options.with_interval ~= nil then
-        builder:every(options.interval or options.every or options.recurring or options.repeat_every or options.with_interval)
+
+    local interval_keys = { "interval", "every", "recurring", "repeat_every", "with_interval", "repeatEvery", "withInterval" }
+    if has_any(options, interval_keys) then
+        builder:every(first_present(options, interval_keys))
     end
-    if options.priority ~= nil or options.prio ~= nil or options.with_priority ~= nil then
-        builder:priority(options.priority or options.prio or options.with_priority)
+
+    local priority_keys = { "priority", "prio", "with_priority", "withPriority" }
+    if has_any(options, priority_keys) then
+        builder:priority(first_present(options, priority_keys))
     end
-    if options.args ~= nil or options.arguments ~= nil or options.params ~= nil or options.with_args ~= nil then
-        builder:with_args(options.args or options.arguments or options.params or options.with_args)
+
+    local args_keys = { "args", "arguments", "params", "with_args", "withArgs" }
+    if has_any(options, args_keys) then
+        builder:with_args(first_present(options, args_keys))
     end
-    if options.tag ~= nil or options.with_tag ~= nil or options.tagged ~= nil or options.named ~= nil then
-        builder:tag(options.tag or options.with_tag or options.tagged or options.named)
+
+    local tag_keys = { "tag", "with_tag", "tagged", "named", "withTag" }
+    if has_any(options, tag_keys) then
+        builder:tag(first_present(options, tag_keys))
     end
-    if options.timeout ~= nil or options.ttl ~= nil or options.with_timeout ~= nil or options.expires_after ~= nil then
-        builder:timeout(options.timeout or options.ttl or options.with_timeout or options.expires_after)
+
+    local timeout_keys = { "timeout", "ttl", "with_timeout", "expires_after", "withTimeout", "expiresAfter" }
+    if has_any(options, timeout_keys) then
+        builder:timeout(first_present(options, timeout_keys))
     end
-    if type(options.on_complete) == "function" or type(options.onComplete) == "function" then
-        builder:on_complete(options.on_complete or options.onComplete)
+
+    local on_complete_keys = { "on_complete", "onComplete" }
+    for i = 1, #on_complete_keys do
+        local value = options[on_complete_keys[i]]
+        if type(value) == "function" then
+            builder:on_complete(value)
+            break
+        end
     end
-    if options.weight ~= nil or options.cost ~= nil or options.with_weight ~= nil then
-        builder:weight(options.weight or options.cost or options.with_weight)
+
+    local weight_keys = { "weight", "cost", "with_weight", "withWeight" }
+    if has_any(options, weight_keys) then
+        builder:weight(first_present(options, weight_keys))
     end
-    if options.dependencies ~= nil or options.depends_on ~= nil or options.depends ~= nil or options.dependsOn ~= nil or options.requires ~= nil or options.needs ~= nil or options.with_dependencies ~= nil then
-        builder:depends_on(options.dependencies or options.depends_on or options.depends or options.dependsOn or options.requires or options.needs or options.with_dependencies)
+
+    local dependency_keys = { "dependencies", "depends_on", "depends", "dependsOn", "requires", "needs", "with_dependencies", "withDependencies" }
+    if has_any(options, dependency_keys) then
+        builder:depends_on(first_present(options, dependency_keys))
     end
-    if options.groups ~= nil or options.group ~= nil or options.with_group ~= nil or options.with_groups ~= nil or options.in_group ~= nil or options.inGroup ~= nil or options.grouped ~= nil then
-        builder:group(options.groups or options.group or options.with_group or options.with_groups or options.in_group or options.inGroup or options.grouped)
+
+    local group_keys = { "groups", "group", "with_group", "with_groups", "in_group", "inGroup", "grouped", "withGroup", "withGroups" }
+    if has_any(options, group_keys) then
+        builder:group(first_present(options, group_keys))
     end
 
     return builder
@@ -163,8 +209,8 @@ function TaskBuilder.new(scheduler, callback, options)
 
     if type(scheduler) == "table" and type(scheduler.add_task) ~= "function" then
         constructor_opts = scheduler
-        scheduler = constructor_opts.scheduler or constructor_opts.sched or constructor_opts.queue
-        callback = constructor_opts.callback or constructor_opts.run or constructor_opts.action or constructor_opts.job or constructor_opts.work or constructor_opts.fn or constructor_opts.func or constructor_opts.handler or callback
+        scheduler = constructor_opts.scheduler or constructor_opts.sched or constructor_opts.queue or constructor_opts.engine or constructor_opts.runner or constructor_opts.task_scheduler or constructor_opts.taskScheduler
+        callback = constructor_opts.callback or constructor_opts.run or constructor_opts.action or constructor_opts.job or constructor_opts.work or constructor_opts.fn or constructor_opts.func or constructor_opts.handler or constructor_opts.task or constructor_opts.execute or constructor_opts.invoke or callback
     end
 
     if type(scheduler) ~= "table" or type(scheduler.add_task) ~= "function" then
@@ -275,6 +321,10 @@ function TaskBuilder:group(name, ...)
     return self
 end
 
+function TaskBuilder:options(options)
+    return apply_options(self, options)
+end
+
 function TaskBuilder:schedule()
     if type(self._callback) ~= "function" then
         error("TaskBuilder: a callback is required; call :run(callback) first")
@@ -340,11 +390,19 @@ local aliases = {
     fn = "run",
     func = "run",
     handler = "run",
+    task = "run",
+    execute = "run",
+    invoke = "run",
     delay = "after",
     with_delay = "after",
     delay_for = "after",
     wait_for = "after",
     start_in = "after",
+    wait = "after",
+    withDelay = "after",
+    delayFor = "after",
+    waitFor = "after",
+    startIn = "after",
     at = "at_time",
     run_at = "at_time",
     start_at = "at_time",
@@ -354,31 +412,49 @@ local aliases = {
     schedule_for = "schedule_at",
     at_timestamp = "at_time",
     wait_until = "at_time",
+    runAt = "at_time",
+    atTime = "at_time",
+    startAt = "at_time",
+    delayUntil = "at_time",
+    scheduleAtTime = "schedule_at",
+    runAtTime = "schedule_at",
+    scheduleFor = "schedule_at",
+    atTimestamp = "at_time",
+    waitUntil = "at_time",
     interval = "every",
     recurring = "every",
     repeat_every = "every",
     with_interval = "every",
+    repeatEvery = "every",
+    withInterval = "every",
     with_priority = "priority",
     prio = "priority",
+    withPriority = "priority",
     args = "with_args",
     arguments = "with_args",
     params = "with_args",
     with_args = "with_args",
+    withArgs = "with_args",
     with_tag = "tag",
     tagged = "tag",
     named = "tag",
+    withTag = "tag",
     with_timeout = "timeout",
     expires_after = "timeout",
     ttl = "timeout",
+    withTimeout = "timeout",
+    expiresAfter = "timeout",
     onComplete = "on_complete",
     with_weight = "weight",
     cost = "weight",
+    withWeight = "weight",
     depends = "depends_on",
     dependsOn = "depends_on",
     requires = "depends_on",
     needs = "depends_on",
     with_dependencies = "depends_on",
     dependencies = "depends_on",
+    withDependencies = "depends_on",
     in_group = "group",
     inGroup = "group",
     with_group = "group",
@@ -386,12 +462,21 @@ local aliases = {
     with_groups = "group",
     groups = "group",
     grouped = "group",
+    withGroups = "group",
     immediately = "now",
     asap = "now",
     right_now = "now",
     build = "schedule",
     submit = "schedule",
     enqueue = "schedule",
+    create = "schedule",
+    add = "schedule",
+    register = "schedule",
+    push = "schedule",
+    configure = "options",
+    with_options = "options",
+    set_options = "options",
+    options = "options",
 }
 
 for alias, canonical in pairs(aliases) do
