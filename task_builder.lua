@@ -47,6 +47,10 @@ local function collect_values(values)
     local result = {}
     local visited = {}
 
+    if values == nil then
+        return result
+    end
+
     local function visit(value)
         if value == nil then
             return
@@ -139,7 +143,10 @@ local function apply_options(builder, options)
 
     local callback_keys = { "callback", "run", "action", "job", "work", "fn", "func", "handler", "task", "execute", "invoke" }
     if has_any(options, callback_keys) then
-        builder:run(first_present(options, callback_keys))
+        local callback_value = first_present(options, callback_keys)
+        if type(callback_value) == "function" then
+            builder:run(callback_value)
+        end
     end
 
     local delay_keys = { "delay", "after", "delay_for", "wait_for", "start_in", "with_delay", "delayFor", "waitFor", "startIn", "withDelay" }
@@ -191,12 +198,12 @@ local function apply_options(builder, options)
         builder:weight(first_present(options, weight_keys))
     end
 
-    local dependency_keys = { "dependencies", "depends_on", "depends", "dependsOn", "requires", "needs", "with_dependencies", "withDependencies" }
+    local dependency_keys = { "dependencies", "depends_on", "depends", "dependsOn", "requires", "needs", "with_dependencies", "withDependencies", "dependency", "depend", "required", "require", "prerequisite", "prerequisites" }
     if has_any(options, dependency_keys) then
         builder:depends_on(first_present(options, dependency_keys))
     end
 
-    local group_keys = { "groups", "group", "with_group", "with_groups", "in_group", "inGroup", "grouped", "withGroup", "withGroups" }
+    local group_keys = { "groups", "group", "with_group", "with_groups", "in_group", "inGroup", "grouped", "withGroup", "withGroups", "group_name", "group_names" }
     if has_any(options, group_keys) then
         builder:group(first_present(options, group_keys))
     end
@@ -209,7 +216,7 @@ function TaskBuilder.new(scheduler, callback, options)
 
     if type(scheduler) == "table" and type(scheduler.add_task) ~= "function" then
         constructor_opts = scheduler
-        scheduler = constructor_opts.scheduler or constructor_opts.sched or constructor_opts.queue or constructor_opts.engine or constructor_opts.runner or constructor_opts.task_scheduler or constructor_opts.taskScheduler
+        scheduler = constructor_opts.scheduler or constructor_opts.sched or constructor_opts.queue or constructor_opts.engine or constructor_opts.runner or constructor_opts.task_scheduler or constructor_opts.taskScheduler or constructor_opts.instance or constructor_opts.target or constructor_opts.context
         callback = constructor_opts.callback or constructor_opts.run or constructor_opts.action or constructor_opts.job or constructor_opts.work or constructor_opts.fn or constructor_opts.func or constructor_opts.handler or constructor_opts.task or constructor_opts.execute or constructor_opts.invoke or callback
     end
 
